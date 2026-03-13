@@ -267,54 +267,58 @@ function buildTabTree(tabs, parents) {
   });
 
   const roots = [];
-  const pinnedTabs = [];
+  const pinnedRoots = [];
 
   tabs.forEach(tab => {
-    if (tab.pinned) {
-      pinnedTabs.push(tabMap[tab.id]);
-      return;
-    }
     const parentId = parents[tab.id];
-    if (parentId && tabMap[parentId]) {
-      tabMap[parentId].children.push(tabMap[tab.id]);
+    const parentTab = parentId ? tabMap[parentId] : null;
+
+    if (parentTab && parentTab.pinned === tab.pinned) {
+      // 同じピン状態の親がいる場合のみ親子関係を反映
+      parentTab.children.push(tabMap[tab.id]);
+    } else if (tab.pinned) {
+      pinnedRoots.push(tabMap[tab.id]);
     } else {
       roots.push(tabMap[tab.id]);
     }
   });
 
-  return { roots, pinnedTabs };
+  return { roots, pinnedRoots };
 }
 
 // タブツリーを描画
 function renderTabTree() {
   const container = document.getElementById('tab-tree');
-  const { roots, pinnedTabs } = buildTabTree(state.tabs, state.tabParents);
+  const { roots, pinnedRoots } = buildTabTree(state.tabs, state.tabParents);
 
-  // 固定タブ件数ラベルを更新（非表示時も件数は反映）
+  // 固定タブ合計（子孫含む）
+  const pinnedTotal = pinnedRoots.reduce((n, t) => n + 1 + countDescendants(t), 0);
+
+  // 固定タブ件数ラベルを更新
   const pinnedCountEl = document.getElementById('pinned-count-label');
-  if (pinnedCountEl) pinnedCountEl.textContent = String(pinnedTabs.length);
+  if (pinnedCountEl) pinnedCountEl.textContent = String(pinnedTotal);
 
   // 固定タブトグルボタンのスタイル更新
   const togglePinnedBtn = document.getElementById('btn-toggle-pinned');
   if (togglePinnedBtn) {
     togglePinnedBtn.classList.toggle('pinned-hidden', !state.showPinnedTabs);
     togglePinnedBtn.title = state.showPinnedTabs
-      ? `固定タブを非表示 (${pinnedTabs.length}件)`
-      : `固定タブを表示 (${pinnedTabs.length}件)`;
+      ? `固定タブを非表示 (${pinnedTotal}件)`
+      : `固定タブを表示 (${pinnedTotal}件)`;
   }
 
   container.innerHTML = '';
 
-  // ピン留めタブセクション（トグル対応）
-  if (pinnedTabs.length > 0 && state.showPinnedTabs) {
+  // 固定タブセクション（ツリー形式）
+  if (pinnedRoots.length > 0 && state.showPinnedTabs) {
     const pinnedSection = document.createElement('div');
     pinnedSection.className = 'pinned-section';
     const label = document.createElement('div');
     label.className = 'section-label';
-    label.textContent = `📌 固定タブ (${pinnedTabs.length})`;
+    label.textContent = `📌 固定タブ (${pinnedTotal})`;
     pinnedSection.appendChild(label);
-    pinnedTabs.forEach(tab => {
-      pinnedSection.appendChild(createTabElement(tab, 0));
+    pinnedRoots.forEach(tab => {
+      renderTabNode(pinnedSection, tab, 0);
     });
     container.appendChild(pinnedSection);
   }
@@ -328,7 +332,7 @@ function renderTabTree() {
     container.appendChild(treeSection);
   }
 
-  if (pinnedTabs.length === 0 && roots.length === 0) {
+  if (pinnedTotal === 0 && roots.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3z"/></svg>
       <p>タブが見つかりません</p>
@@ -385,7 +389,7 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
       : ''
     }
     ${!faviconUrl ? getDefaultFavicon() : `<span class="tab-favicon-default" style="display:none">${getDefaultFavicon()}</span>`}
-    ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6z"/></svg>' : ''}
+    ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>' : ''}
     <div class="tab-info">
       <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
       ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
@@ -397,7 +401,7 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     <div class="tab-actions">
       ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="固定">
         <svg viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15z"/>
+          <path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/>
         </svg>
       </button>` : ''}
       ${hasChildren ? (() => {
@@ -497,7 +501,7 @@ function showTabContextMenu(x, y, tab) {
   const menuItems = [
     {
       label: tab.pinned ? '固定を解除' : 'タブを固定',
-      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2z"/></svg>`,
+      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>`,
       action: () => toggleTabPin(tab.id, !tab.pinned)
     },
     {
@@ -506,6 +510,18 @@ function showTabContextMenu(x, y, tab) {
       action: () => createChildTab(tab.id)
     }
   ];
+
+  // これより下のタブを子タブにする（非固定タブで、下にタブがある場合）
+  if (!tab.pinned) {
+    const belowTabs = state.tabs.filter(t => !t.pinned && t.index > tab.index);
+    if (belowTabs.length > 0) {
+      menuItems.push({
+        label: `これより下のタブを子タブにする (${belowTabs.length}個)`,
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+        action: () => makeTabsBelowChildren(tab)
+      });
+    }
+  }
 
   // 親タブの場合、追加メニュー
   if (hasChildren) {
@@ -595,6 +611,20 @@ function showTabContextMenu(x, y, tab) {
   );
 
   showContextMenu(x, y, menuItems);
+}
+
+// これより下（index順）の非固定タブをすべて自分の子タブにする
+async function makeTabsBelowChildren(tab) {
+  const belowTabs = state.tabs.filter(t => !t.pinned && t.index > tab.index);
+  if (belowTabs.length === 0) {
+    showToast('このタブより下にタブがありません', 'error');
+    return;
+  }
+  for (const t of belowTabs) {
+    await sendMessage('SET_TAB_PARENT', { tabId: t.id, parentId: tab.id });
+  }
+  showToast(`${belowTabs.length}個のタブを子タブにしました`, 'success');
+  await refreshTabTree();
 }
 
 // 親タブの子をすべて1つ上のレベルに移動
@@ -862,6 +892,9 @@ function setupDragAndDrop(item, tab) {
 
     const draggedTab = state.tabs.find(t => t.id === dragTabId);
     if (!draggedTab) return;
+
+    // 固定タブ↔非固定タブ間のドロップは無効
+    if (draggedTab.pinned !== tab.pinned) return;
 
     try {
       if (y >= h * 0.25 && y <= h * 0.75) {
