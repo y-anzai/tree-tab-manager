@@ -1264,6 +1264,11 @@ body.mode-mini .pinned-count-label  { padding: 0 4px; min-width: 14px; font-size
 .toolbar-btn.mode-active-compact,
 .toolbar-btn.mode-active-mini       { color: var(--accent-blue); }
 
+.toolbar-btn.sort-mode-active {
+  color: var(--accent-blue);
+  background: rgba(137, 180, 250, 0.12);
+}
+
 /* ===== 親タブと子タブのスタイリング ===== */
 .tab-item.has-children {
   font-weight: 500;
@@ -1288,3 +1293,113 @@ body.mode-mini .pinned-count-label  { padding: 0 4px; min-width: 14px; font-size
   color: var(--accent-red) !important;
   background: rgba(243, 139, 168, 0.15) !important;
 }
+
+/* ===== タブグループ ===== */
+.tab-group-section {
+  margin-bottom: 1px;
+}
+
+.tab-group-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 4px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-left: 3px solid transparent;
+  transition: background var(--transition);
+  user-select: none;
+}
+
+.tab-group-header:hover {
+  background: var(--bg-hover);
+}
+
+.tab-group-toggle {
+  width: 10px;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.tab-group-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+
+.tab-group-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tab-group-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-group-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.tab-group-children {
+  /* 展開時はデフォルト表示 */
+}
+
+.tab-group-children.collapsed {
+  display: none;
+}
+
+/* グループヘッダー カラー（border-left と dot の色） */
+.tab-group-header.group-color-grey   { border-left-color: #9aa0a6; }
+.tab-group-header.group-color-grey   .tab-group-dot { background: #9aa0a6; }
+.tab-group-header.group-color-blue   { border-left-color: #8ab4f8; }
+.tab-group-header.group-color-blue   .tab-group-dot { background: #8ab4f8; }
+.tab-group-header.group-color-red    { border-left-color: #f28b82; }
+.tab-group-header.group-color-red    .tab-group-dot { background: #f28b82; }
+.tab-group-header.group-color-yellow { border-left-color: #fdd663; }
+.tab-group-header.group-color-yellow .tab-group-dot { background: #fdd663; }
+.tab-group-header.group-color-green  { border-left-color: #81c995; }
+.tab-group-header.group-color-green  .tab-group-dot { background: #81c995; }
+.tab-group-header.group-color-pink   { border-left-color: #ff8bcb; }
+.tab-group-header.group-color-pink   .tab-group-dot { background: #ff8bcb; }
+.tab-group-header.group-color-purple { border-left-color: #c58af9; }
+.tab-group-header.group-color-purple .tab-group-dot { background: #c58af9; }
+.tab-group-header.group-color-cyan   { border-left-color: #78d9ec; }
+.tab-group-header.group-color-cyan   .tab-group-dot { background: #78d9ec; }
+.tab-group-header.group-color-orange { border-left-color: #fcad70; }
+.tab-group-header.group-color-orange .tab-group-dot { background: #fcad70; }
+
+/* タブアイテム上のグループ小ドット */
+.tab-group-dot-sm {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.group-dot-grey   { background: #9aa0a6; }
+.group-dot-blue   { background: #8ab4f8; }
+.group-dot-red    { background: #f28b82; }
+.group-dot-yellow { background: #fdd663; }
+.group-dot-green  { background: #81c995; }
+.group-dot-pink   { background: #ff8bcb; }
+.group-dot-purple { background: #c58af9; }
+.group-dot-cyan   { background: #78d9ec; }
+.group-dot-orange { background: #fcad70; }

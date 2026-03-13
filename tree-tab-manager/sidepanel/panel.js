@@ -11,7 +11,9 @@ const state = {
   currentWindowId: null,
   showPinnedTabs: true,  // 固定タブセクションの表示状態
   tabActivationTime: {},  // tabId -> lastActivationTime（最近開いた順用）
-  tabGroupMap: {},    // tabId -> groupId（グループ認識用）
+  tabGroupMap: {},        // tabId -> groupId（グループ認識用）
+  tabGroupInfo: {},       // groupId -> { id, title, color, collapsed }
+  tabGroupCollapseState: {}, // groupId -> collapsed (ローカルサイドバー状態)
 
   // 履歴パネル
   historyItems: [],
@@ -89,6 +91,32 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
   const idx  = DISPLAY_MODES.indexOf(state.displayMode);
   const next = DISPLAY_MODES[(idx + 1) % DISPLAY_MODES.length];
   applyDisplayMode(next);
+});
+
+// ===== タブ並び順モード管理 =====
+// 'tree'（ツリー表示）| 'recent'（最近開いた順フラット表示）
+
+function applySortMode(mode) {
+  state.tabSortMode = mode;
+  try { localStorage.setItem('ttm-tabSortMode', mode); } catch {}
+  const btn = document.getElementById('btn-sort-mode');
+  if (!btn) return;
+  btn.classList.toggle('sort-mode-active', mode === 'recent');
+  btn.title = mode === 'recent'
+    ? '並び順: 最近開いた順（クリックでツリー順に戻す）'
+    : '並び順: ツリー（クリックで最近開いた順に）';
+}
+
+// 保存された並び順を復元（なければ 'tree'）
+state.tabSortMode = (() => {
+  try { return localStorage.getItem('ttm-tabSortMode') || 'tree'; } catch { return 'tree'; }
+})();
+applySortMode(state.tabSortMode);
+
+document.getElementById('btn-sort-mode').addEventListener('click', () => {
+  const next = state.tabSortMode === 'tree' ? 'recent' : 'tree';
+  applySortMode(next);
+  renderTabTree();
 });
 
 // ===== ユーティリティ =====
@@ -286,10 +314,155 @@ function buildTabTree(tabs, parents) {
   return { roots, pinnedRoots };
 }
 
+// ===== タブグループ関連 =====
+
+// 任意のタブサブセットからサブツリーを構築（グループ内・未グループの両方で使用）
+function buildSubTree(tabSubset, parents) {
+  const tabIds = new Set(tabSubset.map(t => t.id));
+  const tabMap = {};
+  tabSubset.forEach(tab => { tabMap[tab.id] = { ...tab, children: [] }; });
+  const roots = [];
+  tabSubset.forEach(tab => {
+    const parentId = parents[tab.id];
+    if (parentId && tabIds.has(parentId)) {
+      tabMap[parentId].children.push(tabMap[tab.id]);
+    } else {
+      roots.push(tabMap[tab.id]);
+    }
+  });
+  return roots;
+}
+
+// グループ・未グループが混在した通常タブをChrome順で描画
+function renderNormalTabsWithGroups(container, normalTabs) {
+  let currentGroupId = null;
+  let currentGroupTabsList = [];
+  let ungroupedBuffer = [];
+
+  const flushUngrouped = () => {
+    if (ungroupedBuffer.length === 0) return;
+    const roots = buildSubTree(ungroupedBuffer, state.tabParents);
+    const section = document.createElement('div');
+    roots.forEach(tab => renderTabNode(section, tab, 0));
+    container.appendChild(section);
+    ungroupedBuffer = [];
+  };
+
+  const flushGroup = () => {
+    if (currentGroupId === null || currentGroupTabsList.length === 0) return;
+    const groupInfo = state.tabGroupInfo[currentGroupId];
+    const groupSection = renderGroupSection(currentGroupId, groupInfo, currentGroupTabsList);
+    container.appendChild(groupSection);
+    currentGroupTabsList = [];
+    currentGroupId = null;
+  };
+
+  normalTabs.forEach(tab => {
+    const tabGroupId = state.tabGroupMap[tab.id];
+    if (tabGroupId !== undefined) {
+      flushUngrouped();
+      if (tabGroupId !== currentGroupId) {
+        flushGroup();
+        currentGroupId = tabGroupId;
+      }
+      currentGroupTabsList.push(tab);
+    } else {
+      flushGroup();
+      ungroupedBuffer.push(tab);
+    }
+  });
+  flushGroup();
+  flushUngrouped();
+}
+
+// グループセクションを描画して返す
+function renderGroupSection(groupId, groupInfo, groupTabs) {
+  const section = document.createElement('div');
+  section.className = 'tab-group-section';
+  section.dataset.groupId = groupId;
+
+  const color = groupInfo?.color || 'grey';
+  const isCollapsed = state.tabGroupCollapseState[groupId] || false;
+
+  const header = document.createElement('div');
+  header.className = `tab-group-header group-color-${color}`;
+  header.innerHTML = `
+    <div class="tab-group-toggle ${isCollapsed ? 'collapsed' : ''}">
+      <svg viewBox="0 0 10 10" fill="currentColor"><path d="M2 3l3 4 3-4H2z"/></svg>
+    </div>
+    <div class="tab-group-dot"></div>
+    <span class="tab-group-title">${escapeHtml(groupInfo?.title || 'グループ')}</span>
+    <span class="tab-group-count">${groupTabs.length}</span>
+  `;
+
+  const childrenEl = document.createElement('div');
+  childrenEl.className = `tab-group-children${isCollapsed ? ' collapsed' : ''}`;
+
+  header.addEventListener('click', (e) => {
+    // コンテキストメニューのクリックと競合しない
+    if (e.target.closest('.context-menu')) return;
+    state.tabGroupCollapseState[groupId] = !state.tabGroupCollapseState[groupId];
+    const collapsed = state.tabGroupCollapseState[groupId];
+    header.querySelector('.tab-group-toggle').classList.toggle('collapsed', collapsed);
+    childrenEl.classList.toggle('collapsed', collapsed);
+  });
+
+  header.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showGroupContextMenu(e.clientX, e.clientY, groupId, groupInfo);
+  });
+
+  const roots = buildSubTree(groupTabs, state.tabParents);
+  roots.forEach(tab => renderTabNode(childrenEl, tab, 0));
+
+  section.appendChild(header);
+  section.appendChild(childrenEl);
+  return section;
+}
+
+// グループのコンテキストメニューを表示
+function showGroupContextMenu(x, y, groupId, groupInfo) {
+  const pencilIcon = `<svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`;
+  const xIcon = `<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`;
+
+  showContextMenu(x, y, [
+    {
+      label: 'グループ名を変更',
+      icon: pencilIcon,
+      action: async () => {
+        const newTitle = prompt('グループ名:', groupInfo?.title || '');
+        if (newTitle === null) return;
+        try {
+          await chrome.tabGroups.update(groupId, { title: newTitle });
+          await refreshTabTree();
+        } catch {
+          showToast('グループ名の変更に失敗しました', 'error');
+        }
+      }
+    },
+    { separator: true },
+    {
+      label: 'グループを解除',
+      danger: true,
+      icon: xIcon,
+      action: async () => {
+        const tabsInGroup = state.tabs.filter(t => state.tabGroupMap[t.id] === groupId);
+        try {
+          await chrome.tabs.ungroup(tabsInGroup.map(t => t.id));
+          await refreshTabTree();
+          showToast('グループを解除しました', 'success');
+        } catch {
+          showToast('グループの解除に失敗しました', 'error');
+        }
+      }
+    }
+  ]);
+}
+
 // タブツリーを描画
 function renderTabTree() {
   const container = document.getElementById('tab-tree');
-  const { roots, pinnedRoots } = buildTabTree(state.tabs, state.tabParents);
+  const { pinnedRoots } = buildTabTree(state.tabs, state.tabParents);
 
   // 固定タブ合計（子孫含む）
   const pinnedTotal = pinnedRoots.reduce((n, t) => n + 1 + countDescendants(t), 0);
@@ -309,7 +482,7 @@ function renderTabTree() {
 
   container.innerHTML = '';
 
-  // 固定タブセクション（ツリー形式）
+  // 固定タブセクション（ソートモードに関わらず常にツリー形式）
   if (pinnedRoots.length > 0 && state.showPinnedTabs) {
     const pinnedSection = document.createElement('div');
     pinnedSection.className = 'pinned-section';
@@ -323,16 +496,37 @@ function renderTabTree() {
     container.appendChild(pinnedSection);
   }
 
-  // 通常タブ（ツリー）
-  if (roots.length > 0) {
-    const treeSection = document.createElement('div');
-    roots.forEach(tab => {
-      renderTabNode(treeSection, tab, 0);
+  const normalTabs = state.tabs.filter(t => !t.pinned);
+
+  if (state.tabSortMode === 'recent') {
+    // 最近開いた順（フラット表示、インデントなし）
+    const sorted = [...normalTabs].sort((a, b) => {
+      const ta = state.tabActivationTime[a.id] || 0;
+      const tb = state.tabActivationTime[b.id] || 0;
+      return tb - ta;
     });
-    container.appendChild(treeSection);
+    if (sorted.length > 0) {
+      const listSection = document.createElement('div');
+      sorted.forEach(tab => {
+        const nodeEl = document.createElement('div');
+        nodeEl.className = 'tab-node';
+        nodeEl.dataset.tabId = tab.id;
+        // hasChildren=false でフラット描画（折りたたみなし）
+        nodeEl.appendChild(createTabElement(tab, 0, false, false));
+        listSection.appendChild(nodeEl);
+      });
+      container.appendChild(listSection);
+    }
+  } else {
+    // 通常のツリー表示（グループ対応）
+    if (normalTabs.length > 0) {
+      const treeSection = document.createElement('div');
+      renderNormalTabsWithGroups(treeSection, normalTabs);
+      container.appendChild(treeSection);
+    }
   }
 
-  if (pinnedTotal === 0 && roots.length === 0) {
+  if (pinnedTotal === 0 && normalTabs.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3z"/></svg>
       <p>タブが見つかりません</p>
@@ -377,6 +571,13 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
   // 固定タブではピンボタンを非表示（右クリックメニューで操作可能）
   const showPinBtn = !tab.pinned;
 
+  // グループカラードット
+  const tabGroupId = state.tabGroupMap[tab.id];
+  const tabGroupInfo = tabGroupId !== undefined ? state.tabGroupInfo[tabGroupId] : null;
+  const groupDotHtml = tabGroupInfo
+    ? `<span class="tab-group-dot-sm group-dot-${tabGroupInfo.color}" title="${escapeHtml(tabGroupInfo.title || 'グループ')}"></span>`
+    : '';
+
   item.innerHTML = `
     <div class="tab-indent" style="width:${indentPx}px"></div>
     <div class="tab-toggle ${hasChildren ? (isCollapsed ? 'collapsed' : '') : 'no-children'}">
@@ -384,6 +585,7 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
         <path d="M2 3l3 4 3-4H2z"/>
       </svg>
     </div>
+    ${groupDotHtml}
     ${faviconUrl
       ? `<img class="tab-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="">`
       : ''
@@ -495,8 +697,8 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
 }
 
 function showTabContextMenu(x, y, tab) {
-  // 親タブ（子タブがある）かどうか
-  const hasChildren = tab.children && tab.children.length > 0;
+  // 親タブ（子タブがある）かどうか（state.tabParents から正確に判定）
+  const hasChildren = state.tabs.some(t => state.tabParents[t.id] === tab.id);
 
   const menuItems = [
     {
@@ -510,6 +712,46 @@ function showTabContextMenu(x, y, tab) {
       action: () => createChildTab(tab.id)
     }
   ];
+
+  // タブグループ操作（固定タブ以外）
+  if (!tab.pinned) {
+    const tabGroupId = state.tabGroupMap[tab.id];
+    if (tabGroupId !== undefined) {
+      // グループ内のタブ → グループから除外
+      menuItems.push({
+        label: 'グループから除外',
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+        action: async () => {
+          try {
+            await chrome.tabs.ungroup([tab.id]);
+            await refreshTabTree();
+            showToast('グループから除外しました', 'success');
+          } catch {
+            showToast('グループからの除外に失敗しました', 'error');
+          }
+        }
+      });
+    } else {
+      // グループ外のタブ → 新しいグループを作成
+      menuItems.push({
+        label: '新しいグループを作成',
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>`,
+        action: async () => {
+          try {
+            const gid = await chrome.tabs.group({ tabIds: [tab.id] });
+            const title = prompt('グループ名 (省略可):', '');
+            if (title !== null && title.trim()) {
+              await chrome.tabGroups.update(gid, { title: title.trim() });
+            }
+            await refreshTabTree();
+            showToast('グループを作成しました', 'success');
+          } catch {
+            showToast('グループの作成に失敗しました', 'error');
+          }
+        }
+      });
+    }
+  }
 
   // これより下のタブを子タブにする（非固定タブで、下にタブがある場合）
   if (!tab.pinned) {
@@ -900,6 +1142,10 @@ function setupDragAndDrop(item, tab) {
       if (y >= h * 0.25 && y <= h * 0.75) {
         // ドロップ先の子タブにする
         await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId: tab.id });
+        // Chrome本体のタブ位置も同期: 親の直後に移動
+        if (draggedTab.windowId === tab.windowId) {
+          await chrome.tabs.move(dragTabId, { index: tab.index + 1 });
+        }
       } else {
         // ドロップ先と同じ親にする
         const parentId = state.tabParents[tab.id] || null;
@@ -960,19 +1206,26 @@ async function loadTabs() {
     } catch {}
   });
 
-  // グループ情報を取得
+  // グループ情報を取得（タブ一覧の groupId を直接利用して効率化）
   try {
     const groups = await chrome.tabGroups.query({ windowId: state.currentWindowId });
+    state.tabGroupInfo = {};
     state.tabGroupMap = {};
     groups.forEach(group => {
-      // グループ内のタブを取得して紐づける
-      chrome.tabs.query({ groupId: group.id }).then(groupTabs => {
-        groupTabs.forEach(t => {
-          state.tabGroupMap[t.id] = group.id;
-        });
-      });
+      state.tabGroupInfo[group.id] = {
+        id: group.id,
+        title: group.title,
+        color: group.color,
+        collapsed: group.collapsed
+      };
+    });
+    tabs.forEach(tab => {
+      if (tab.groupId !== undefined && tab.groupId !== -1) {
+        state.tabGroupMap[tab.id] = tab.groupId;
+      }
     });
   } catch {
+    state.tabGroupInfo = {};
     state.tabGroupMap = {};
   }
 
