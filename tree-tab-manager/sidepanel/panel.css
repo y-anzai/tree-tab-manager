@@ -6,6 +6,7 @@
 }
 
 :root {
+  /* ダークモード（デフォルト） */
   --bg-primary: #1e1e2e;
   --bg-secondary: #2a2a3e;
   --bg-tertiary: #313145;
@@ -28,6 +29,32 @@
   --radius-md: 6px;
   --radius-lg: 8px;
   --transition: 150ms ease;
+}
+
+/* ライトモード */
+[data-color-scheme="light"] {
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #e8e8eb;
+  --bg-tertiary: #d9d9dd;
+  --bg-hover: #ccc;
+  --bg-active: #b3b3b8;
+  --text-primary: #1d1d1f;
+  --text-secondary: #424245;
+  --text-muted: #86868b;
+  --accent-blue: #0071e3;
+  --accent-green: #34c759;
+  --accent-yellow: #ff9500;
+  --accent-red: #ff3b30;
+  --accent-purple: #a855f7;
+  --accent-pink: #ff2d55;
+  --border: #d5d5d7;
+  --shadow: rgba(0, 0, 0, 0.1);
+}
+
+html {
+  min-width: 160px;
+  height: 100%;
+  overflow: hidden;
 }
 
 html, body {
@@ -132,12 +159,15 @@ body.mode-mini .header-title-text { display: none; }
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .toolbar-right {
   margin-left: auto;
   display: flex;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .toolbar-btn {
@@ -152,6 +182,9 @@ body.mode-mini .header-title-text { display: none; }
   cursor: pointer;
   font-size: 12px;
   transition: all var(--transition);
+  flex-shrink: 1;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .toolbar-btn svg {
@@ -416,7 +449,7 @@ body.mode-mini .header-title-text { display: none; }
 .pinned-count-label {
   font-size: 11px;
   font-weight: 600;
-  background: var(--accent-purple);
+  background: var(--accent-yellow);
   color: var(--bg-primary);
   border-radius: 10px;
   padding: 1px 5px;
@@ -1075,6 +1108,57 @@ body.mode-mini .header-title-text { display: none; }
   margin: 4px 0;
 }
 
+/* グレーアウト（無効）項目 */
+.context-menu-item.disabled {
+  opacity: 0.38;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* 補足ヒント（右端に小さく表示） */
+.context-menu-hint {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-left: 8px;
+}
+
+/* グループ色選択スウォッチ行 */
+.context-menu-color-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 6px;
+}
+
+.context-menu-color-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.color-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+  flex-shrink: 0;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.color-swatch:hover {
+  transform: scale(1.3);
+}
+
+.color-swatch.active {
+  border-color: var(--text-primary);
+}
+
 /* ===== トースト通知 ===== */
 .toast {
   position: fixed;
@@ -1230,3 +1314,143 @@ body.mode-mini .pinned-count-label  { padding: 0 4px; min-width: 14px; font-size
 /* ─── 表示モードボタン：現在のモードに応じたアクセントカラー ─── */
 .toolbar-btn.mode-active-compact,
 .toolbar-btn.mode-active-mini       { color: var(--accent-blue); }
+
+.toolbar-btn.sort-mode-active {
+  color: var(--accent-blue);
+  background: rgba(137, 180, 250, 0.12);
+}
+
+/* ===== 親タブと子タブのスタイリング ===== */
+.tab-item.has-children {
+  font-weight: 500;
+}
+
+.tab-item.has-children .tab-toggle {
+  color: var(--accent-blue);
+}
+
+/* 親タブのドラッグ時のスタイル */
+.tab-item.selecting-parent {
+  outline: 2px dashed var(--accent-blue);
+  outline-offset: -1px;
+  background: rgba(137, 180, 250, 0.1);
+}
+
+/* ツリーごと削除ボタン */
+.close-tree-btn {
+  color: var(--accent-yellow) !important;
+}
+.close-tree-btn:hover {
+  color: var(--accent-red) !important;
+  background: rgba(243, 139, 168, 0.15) !important;
+}
+
+/* ===== タブグループ ===== */
+.tab-group-section {
+  margin-bottom: 1px;
+}
+
+.tab-group-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 4px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-left: 3px solid transparent;
+  transition: background var(--transition);
+  user-select: none;
+}
+
+.tab-group-header:hover {
+  background: var(--bg-hover);
+}
+
+.tab-group-toggle {
+  width: 10px;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.tab-group-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+
+.tab-group-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tab-group-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-group-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.tab-group-children {
+  /* 展開時はデフォルト表示 */
+}
+
+.tab-group-children.collapsed {
+  display: none;
+}
+
+/* グループヘッダー カラー（border-left と dot の色） */
+.tab-group-header.group-color-grey   { border-left-color: #9aa0a6; }
+.tab-group-header.group-color-grey   .tab-group-dot { background: #9aa0a6; }
+.tab-group-header.group-color-blue   { border-left-color: #8ab4f8; }
+.tab-group-header.group-color-blue   .tab-group-dot { background: #8ab4f8; }
+.tab-group-header.group-color-red    { border-left-color: #f28b82; }
+.tab-group-header.group-color-red    .tab-group-dot { background: #f28b82; }
+.tab-group-header.group-color-yellow { border-left-color: #fdd663; }
+.tab-group-header.group-color-yellow .tab-group-dot { background: #fdd663; }
+.tab-group-header.group-color-green  { border-left-color: #81c995; }
+.tab-group-header.group-color-green  .tab-group-dot { background: #81c995; }
+.tab-group-header.group-color-pink   { border-left-color: #ff8bcb; }
+.tab-group-header.group-color-pink   .tab-group-dot { background: #ff8bcb; }
+.tab-group-header.group-color-purple { border-left-color: #c58af9; }
+.tab-group-header.group-color-purple .tab-group-dot { background: #c58af9; }
+.tab-group-header.group-color-cyan   { border-left-color: #78d9ec; }
+.tab-group-header.group-color-cyan   .tab-group-dot { background: #78d9ec; }
+.tab-group-header.group-color-orange { border-left-color: #fcad70; }
+.tab-group-header.group-color-orange .tab-group-dot { background: #fcad70; }
+
+/* タブアイテム上のグループ小ドット */
+.tab-group-dot-sm {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.group-dot-grey   { background: #9aa0a6; }
+.group-dot-blue   { background: #8ab4f8; }
+.group-dot-red    { background: #f28b82; }
+.group-dot-yellow { background: #fdd663; }
+.group-dot-green  { background: #81c995; }
+.group-dot-pink   { background: #ff8bcb; }
+.group-dot-purple { background: #c58af9; }
+.group-dot-cyan   { background: #78d9ec; }
+.group-dot-orange { background: #fcad70; }

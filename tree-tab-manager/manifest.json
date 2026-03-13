@@ -5,6 +5,7 @@
   "description": "タブをツリー形式で管理するサイドバー拡張機能",
   "permissions": [
     "tabs",
+    "tabGroups",
     "history",
     "bookmarks",
     "storage",

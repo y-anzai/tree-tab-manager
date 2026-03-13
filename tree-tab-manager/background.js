@@ -28,7 +28,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 
 // タブ更新時に通知
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl) {
+  if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl || 'groupId' in changeInfo) {
     notifyPanels({ type: 'TAB_UPDATED', tabId, changeInfo });
   }
 });
@@ -65,6 +65,11 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 chrome.tabs.onAttached.addListener((tabId, attachInfo) => {
   notifyPanels({ type: 'TAB_ATTACHED', tabId });
 });
+
+// タブグループ変更時に通知
+chrome.tabGroups.onCreated.addListener(() => notifyPanels({ type: 'TREE_UPDATED' }));
+chrome.tabGroups.onUpdated.addListener(() => notifyPanels({ type: 'TREE_UPDATED' }));
+chrome.tabGroups.onRemoved.addListener(() => notifyPanels({ type: 'TREE_UPDATED' }));
 
 // サイドパネルからのメッセージを処理
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -110,7 +115,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'NEW_TAB':
       chrome.tabs.create({ url: message.url || undefined, openerTabId: message.openerTabId || undefined })
-        .then((tab) => sendResponse({ tab }));
+        .then((tab) => {
+          // openerTabId は onCreated のコールバックで取得できないケースがあるため
+          // NEW_TAB ハンドラ側で明示的に親子関係を設定する
+          if (message.openerTabId) {
+            tabParentMap.set(tab.id, message.openerTabId);
+          }
+          notifyPanels({ type: 'TREE_UPDATED' });
+          sendResponse({ tab });
+        });
       return true;
 
     case 'GET_HISTORY':
