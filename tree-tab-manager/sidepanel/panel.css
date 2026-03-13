@@ -1267,3 +1267,12 @@ body.mode-mini .pinned-count-label  { padding: 0 4px; min-width: 14px; font-size
   outline-offset: -1px;
   background: rgba(137, 180, 250, 0.1);
 }
+
+/* ツリーごと削除ボタン */
+.close-tree-btn {
+  color: var(--accent-yellow) !important;
+}
+.close-tree-btn:hover {
+  color: var(--accent-red) !important;
+  background: rgba(243, 139, 168, 0.15) !important;
+}

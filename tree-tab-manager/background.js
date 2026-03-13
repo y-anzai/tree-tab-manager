@@ -110,7 +110,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'NEW_TAB':
       chrome.tabs.create({ url: message.url || undefined, openerTabId: message.openerTabId || undefined })
-        .then((tab) => sendResponse({ tab }));
+        .then((tab) => {
+          // openerTabId は onCreated のコールバックで取得できないケースがあるため
+          // NEW_TAB ハンドラ側で明示的に親子関係を設定する
+          if (message.openerTabId) {
+            tabParentMap.set(tab.id, message.openerTabId);
+          }
+          notifyPanels({ type: 'TREE_UPDATED' });
+          sendResponse({ tab });
+        });
       return true;
 
     case 'GET_HISTORY':

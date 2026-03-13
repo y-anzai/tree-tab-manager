@@ -242,7 +242,15 @@ function hideContextMenu() {
 }
 
 document.addEventListener('click', hideContextMenu);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideContextMenu(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    hideContextMenu();
+    if (state.selectingParentFor != null) {
+      cancelParentSelection();
+      showToast('キャンセルしました');
+    }
+  }
+});
 
 // ===== タブパネル =====
 
@@ -392,6 +400,14 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
           <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15z"/>
         </svg>
       </button>` : ''}
+      ${hasChildren ? (() => {
+        const total = countDescendants(tab);
+        return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="このタブと子タブをすべて閉じる（${total + 1}個）">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+          </svg>
+        </button>`;
+      })() : ''}
       <button class="tab-action-btn close-btn" data-action="close" title="閉じる">
         <svg viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
@@ -405,9 +421,26 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     setTimeout(() => item.scrollIntoView({ block: 'nearest' }), 100);
   }
 
-  // クリックでタブをアクティブ化
+  // クリックでタブをアクティブ化（親選択モード中は親を設定）
   item.addEventListener('click', (e) => {
     if (e.target.closest('.tab-toggle') || e.target.closest('.tab-action-btn')) return;
+
+    // 親選択モード中：クリックされたタブを親に設定
+    if (state.selectingParentFor != null) {
+      const childTabId = state.selectingParentFor;
+      if (tab.id === childTabId) {
+        // 自分自身はキャンセル扱い
+        cancelParentSelection();
+        showToast('キャンセルしました');
+        return;
+      }
+      cancelParentSelection();
+      sendMessage('SET_TAB_PARENT', { tabId: childTabId, parentId: tab.id })
+        .then(() => refreshTabTree())
+        .then(() => showToast('親タブを設定しました', 'success'));
+      return;
+    }
+
     activateTab(tab.id, tab.windowId);
   });
 
@@ -434,6 +467,14 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       closeTab(tab.id);
+    });
+  }
+
+  const closeTreeBtn = item.querySelector('[data-action="close-tree"]');
+  if (closeTreeBtn) {
+    closeTreeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeTabWithChildren(tab.id);
     });
   }
 
@@ -558,30 +599,43 @@ function showTabContextMenu(x, y, tab) {
 
 // 親タブの子をすべて1つ上のレベルに移動
 async function moveChildrenToParentLevel(tabId) {
-  const tab = state.tabs.find(t => t.id === tabId);
-  if (!tab || !tab.children || tab.children.length === 0) return;
+  // state.tabParents を直接使って直接の子タブを収集（state.tabs は .children を持たないフラット配列）
+  const children = state.tabs.filter(t => state.tabParents[t.id] === tabId);
+  if (children.length === 0) {
+    showToast('子タブがありません', 'error');
+    return;
+  }
 
   const parentId = state.tabParents[tabId] || null;
-  for (const child of tab.children) {
+  for (const child of children) {
     await sendMessage('SET_TAB_PARENT', { tabId: child.id, parentId });
   }
-  showToast('子タブを移動しました');
+  showToast('子タブを移動しました', 'success');
   await refreshTabTree();
 }
 
 // 親タブとその子タブをすべて削除
 async function closeTabWithChildren(tabId) {
-  const tab = state.tabs.find(t => t.id === tabId);
-  if (!tab) return;
+  // state.tabParents を使って全子孫IDを収集（state.tabs は .children を持たないフラット配列のため）
+  const descendantIds = [];
+  function collectDescendants(pid) {
+    state.tabs.forEach(t => {
+      if (state.tabParents[t.id] === pid) {
+        descendantIds.push(t.id);
+        collectDescendants(t.id);
+      }
+    });
+  }
+  collectDescendants(tabId);
 
-  const allDescendants = getAllDescendants(tab);
-  for (const descendant of allDescendants) {
-    await closeTab(descendant.id);
+  // IDを先にすべて確定してから閉じる（閉じる途中で state.tabs が変わっても影響しないように）
+  for (const id of descendantIds) {
+    await closeTab(id);
   }
   await closeTab(tabId);
 }
 
-// タブのすべての子孫を取得（配列形式）
+// タブのすべての子孫を取得（配列形式）— ツリー構造オブジェクトが手元にある場合に使用
 function getAllDescendants(tab) {
   let result = [];
   if (tab.children && tab.children.length > 0) {
@@ -593,20 +647,23 @@ function getAllDescendants(tab) {
   return result;
 }
 
-// 親タブの子にする（親タブを選択可能にする操作）
-async function moveToParent(tabId) {
-  const tab = state.tabs.find(t => t.id === tabId);
-  const siblings = state.tabs.filter(t => !t.pinned && state.tabParents[t.id] === state.tabParents[tabId]);
+// 親タブの子にする — 親選択モードを開始
+function moveToParent(tabId) {
+  // 選択対象を state に記録
+  state.selectingParentFor = tabId;
 
-  if (siblings.length === 0) {
-    showToast('親にできるタブがありません', 'error');
-    return;
-  }
+  // 自分自身の行をハイライト
+  document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('selecting-parent'));
+  const self = document.querySelector(`.tab-item[data-tab-id="${tabId}"]`);
+  if (self) self.classList.add('selecting-parent');
 
-  showToast('親にしたいタブをクリックしてください');
-  // UI上で親選択モードを開始するロジック（簡易版）
-  const item = document.querySelector(`.tab-item[data-tab-id="${tabId}"]`);
-  if (item) item.classList.add('selecting-parent');
+  showToast('親にしたいタブをクリック（Escでキャンセル）');
+}
+
+// 親選択モードをキャンセル
+function cancelParentSelection() {
+  state.selectingParentFor = null;
+  document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('selecting-parent'));
 }
 
 // ===== 新規操作機能 =====
@@ -703,6 +760,7 @@ async function toggleTabPin(tabId, pinned) {
   try {
     await sendMessage('PIN_TAB', { tabId, pinned });
     showToast(pinned ? 'タブを固定しました' : '固定を解除しました', 'success');
+    await refreshTabTree();
   } catch (e) {
     console.error('Failed to pin tab:', e);
   }
@@ -743,6 +801,7 @@ function expandAll() {
 async function createChildTab(parentTabId) {
   try {
     await sendMessage('NEW_TAB', { openerTabId: parentTabId });
+    await refreshTabTree();
   } catch (e) {
     console.error('Failed to create child tab:', e);
   }
