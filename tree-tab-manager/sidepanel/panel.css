@@ -6,6 +6,7 @@
 }
 
 :root {
+  /* ダークモード（デフォルト） */
   --bg-primary: #1e1e2e;
   --bg-secondary: #2a2a3e;
   --bg-tertiary: #313145;
@@ -28,6 +29,26 @@
   --radius-md: 6px;
   --radius-lg: 8px;
   --transition: 150ms ease;
+}
+
+/* ライトモード */
+[data-color-scheme="light"] {
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #e8e8eb;
+  --bg-tertiary: #d9d9dd;
+  --bg-hover: #ccc;
+  --bg-active: #b3b3b8;
+  --text-primary: #1d1d1f;
+  --text-secondary: #424245;
+  --text-muted: #86868b;
+  --accent-blue: #0071e3;
+  --accent-green: #34c759;
+  --accent-yellow: #ff9500;
+  --accent-red: #ff3b30;
+  --accent-purple: #a855f7;
+  --accent-pink: #ff2d55;
+  --border: #d5d5d7;
+  --shadow: rgba(0, 0, 0, 0.1);
 }
 
 html, body {
@@ -1230,3 +1251,19 @@ body.mode-mini .pinned-count-label  { padding: 0 4px; min-width: 14px; font-size
 /* ─── 表示モードボタン：現在のモードに応じたアクセントカラー ─── */
 .toolbar-btn.mode-active-compact,
 .toolbar-btn.mode-active-mini       { color: var(--accent-blue); }
+
+/* ===== 親タブと子タブのスタイリング ===== */
+.tab-item.has-children {
+  font-weight: 500;
+}
+
+.tab-item.has-children .tab-toggle {
+  color: var(--accent-blue);
+}
+
+/* 親タブのドラッグ時のスタイル */
+.tab-item.selecting-parent {
+  outline: 2px dashed var(--accent-blue);
+  outline-offset: -1px;
+  background: rgba(137, 180, 250, 0.1);
+}

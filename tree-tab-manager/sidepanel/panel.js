@@ -10,6 +10,8 @@ const state = {
   activeTabId: null,
   currentWindowId: null,
   showPinnedTabs: true,  // 固定タブセクションの表示状態
+  tabActivationTime: {},  // tabId -> lastActivationTime（最近開いた順用）
+  tabGroupMap: {},    // tabId -> groupId（グループ認識用）
 
   // 履歴パネル
   historyItems: [],
@@ -25,6 +27,10 @@ const state = {
   // 最近使用したブックマーク
   recentlyUsedBookmarks: {}, // url -> timestamp
   visitCountMap: {},          // url -> visitCount (総訪問回数)
+
+  // タブ名カスタマイズ
+  customTabNames: {},    // tabId -> customName
+  tabCustomNamesByUrl: {}, // url -> customName（再訪時のため）
 };
 
 // ===== 表示モード管理 =====
@@ -56,6 +62,21 @@ function applyDisplayMode(mode) {
   btn.title = `表示モード: ${MODE_LABELS[mode]}（クリックで切替）`;
   btn.classList.toggle('mode-active-compact', mode === 'compact');
   btn.classList.toggle('mode-active-mini',    mode === 'mini');
+}
+
+// ===== 外観モード（ダーク/ライト）自動切り替え =====
+function applyColorScheme() {
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-color-scheme', isDark ? 'dark' : 'light');
+  document.body.setAttribute('data-color-scheme', isDark ? 'dark' : 'light');
+}
+
+// 初期化時に外観モードを適用
+applyColorScheme();
+
+// システム外観モード変更を監視
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyColorScheme);
 }
 
 // 保存されたモードを復元（なければ 'full'）
@@ -341,6 +362,9 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
   const indentPx = depth * 16 + 4;
   const faviconUrl = tab.favIconUrl || getFaviconUrl(tab.url);
 
+  // 固定タブではピンボタンを非表示（右クリックメニューで操作可能）
+  const showPinBtn = !tab.pinned;
+
   item.innerHTML = `
     <div class="tab-indent" style="width:${indentPx}px"></div>
     <div class="tab-toggle ${hasChildren ? (isCollapsed ? 'collapsed' : '') : 'no-children'}">
@@ -355,7 +379,7 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     ${!faviconUrl ? getDefaultFavicon() : `<span class="tab-favicon-default" style="display:none">${getDefaultFavicon()}</span>`}
     ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6z"/></svg>' : ''}
     <div class="tab-info">
-      <div class="tab-title" title="${escapeHtml(tab.title)}">${escapeHtml(tab.title || '(タイトルなし)')}</div>
+      <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
       ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
     </div>
     ${hasChildren ? (() => {
@@ -363,14 +387,11 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
       return `<span class="desc-badge" title="${total}件の子孫タブ">${total}</span>`;
     })() : ''}
     <div class="tab-actions">
-      <button class="tab-action-btn" data-action="pin" title="${tab.pinned ? '固定解除' : '固定'}">
+      ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="固定">
         <svg viewBox="0 0 20 20" fill="currentColor">
-          ${tab.pinned
-            ? '<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>'
-            : '<path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15z"/>'
-          }
+          <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15z"/>
         </svg>
-      </button>
+      </button>` : ''}
       <button class="tab-action-btn close-btn" data-action="close" title="閉じる">
         <svg viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
@@ -429,7 +450,10 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
 }
 
 function showTabContextMenu(x, y, tab) {
-  showContextMenu(x, y, [
+  // 親タブ（子タブがある）かどうか
+  const hasChildren = tab.children && tab.children.length > 0;
+
+  const menuItems = [
     {
       label: tab.pinned ? '固定を解除' : 'タブを固定',
       icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2z"/></svg>`,
@@ -439,6 +463,79 @@ function showTabContextMenu(x, y, tab) {
       label: '子タブとして新しいタブを開く',
       icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>`,
       action: () => createChildTab(tab.id)
+    }
+  ];
+
+  // 親タブの場合、追加メニュー
+  if (hasChildren) {
+    menuItems.push(
+      { separator: true },
+      {
+        label: '子ツリーを1つ上に移動',
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>`,
+        action: () => moveChildrenToParentLevel(tab.id)
+      },
+      {
+        label: `このタブと子ツリーを削除 (${countDescendants(tab) + 1}個)`,
+        danger: true,
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+        action: () => closeTabWithChildren(tab.id)
+      }
+    );
+  } else {
+    menuItems.push(
+      {
+        label: '親タブの子にする',
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>`,
+        action: () => moveToParent(tab.id)
+      }
+    );
+  }
+
+  // ドメイン集約（同じドメインのタブを子にする）
+  try {
+    const tabUrl = new URL(tab.url);
+    const sameDomainTabs = state.tabs.filter(t => {
+      try {
+        return new URL(t.url).hostname === tabUrl.hostname && t.id !== tab.id && !t.pinned;
+      } catch {
+        return false;
+      }
+    });
+
+    if (sameDomainTabs.length > 0) {
+      menuItems.push(
+        {
+          label: `同じドメインのタブをまとめる (${sameDomainTabs.length}個)`,
+          icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v1h1a2 2 0 012 2v5a2 2 0 01-2 2H4a2 2 0 01-2-2v-5a2 2 0 012-2h1zm8-2v1H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>`,
+          action: () => aggregateSameDomain(tab.id, sameDomainTabs)
+        }
+      );
+    }
+  } catch {}
+
+  // 階層移動：1つ上のツリーの子にする
+  const parentTabId = state.tabParents[tab.id];
+  if (parentTabId) {
+    const parentTab = state.tabs.find(t => t.id === parentTabId);
+    if (parentTab) {
+      const grandParentId = state.tabParents[parentTabId] || null;
+      menuItems.push(
+        {
+          label: '1つ上のツリーの子にする',
+          icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>`,
+          action: () => moveToGrandParentLevel(tab.id, grandParentId)
+        }
+      );
+    }
+  }
+
+  menuItems.push(
+    { separator: true },
+    {
+      label: '名前を編集',
+      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
+      action: () => editTabName(tab)
     },
     {
       label: 'URLをコピー',
@@ -449,17 +546,145 @@ function showTabContextMenu(x, y, tab) {
     },
     { separator: true },
     {
-      label: 'タブを閉じる',
+      label: hasChildren ? 'このタブを閉じる' : 'タブを閉じる',
       danger: true,
       icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
       action: () => closeTab(tab.id)
     }
-  ]);
+  );
+
+  showContextMenu(x, y, menuItems);
+}
+
+// 親タブの子をすべて1つ上のレベルに移動
+async function moveChildrenToParentLevel(tabId) {
+  const tab = state.tabs.find(t => t.id === tabId);
+  if (!tab || !tab.children || tab.children.length === 0) return;
+
+  const parentId = state.tabParents[tabId] || null;
+  for (const child of tab.children) {
+    await sendMessage('SET_TAB_PARENT', { tabId: child.id, parentId });
+  }
+  showToast('子タブを移動しました');
+  await refreshTabTree();
+}
+
+// 親タブとその子タブをすべて削除
+async function closeTabWithChildren(tabId) {
+  const tab = state.tabs.find(t => t.id === tabId);
+  if (!tab) return;
+
+  const allDescendants = getAllDescendants(tab);
+  for (const descendant of allDescendants) {
+    await closeTab(descendant.id);
+  }
+  await closeTab(tabId);
+}
+
+// タブのすべての子孫を取得（配列形式）
+function getAllDescendants(tab) {
+  let result = [];
+  if (tab.children && tab.children.length > 0) {
+    tab.children.forEach(child => {
+      result.push(child);
+      result = result.concat(getAllDescendants(child));
+    });
+  }
+  return result;
+}
+
+// 親タブの子にする（親タブを選択可能にする操作）
+async function moveToParent(tabId) {
+  const tab = state.tabs.find(t => t.id === tabId);
+  const siblings = state.tabs.filter(t => !t.pinned && state.tabParents[t.id] === state.tabParents[tabId]);
+
+  if (siblings.length === 0) {
+    showToast('親にできるタブがありません', 'error');
+    return;
+  }
+
+  showToast('親にしたいタブをクリックしてください');
+  // UI上で親選択モードを開始するロジック（簡易版）
+  const item = document.querySelector(`.tab-item[data-tab-id="${tabId}"]`);
+  if (item) item.classList.add('selecting-parent');
+}
+
+// ===== 新規操作機能 =====
+
+// 同じドメインのタブをまとめる
+async function aggregateSameDomain(parentTabId, sameDomainTabs) {
+  for (const tab of sameDomainTabs) {
+    await sendMessage('SET_TAB_PARENT', { tabId: tab.id, parentId: parentTabId });
+  }
+  showToast(`${sameDomainTabs.length}個のタブを子にしました`, 'success');
+  await refreshTabTree();
+}
+
+// 1つ上のツリーレベルの子にする
+async function moveToGrandParentLevel(tabId, grandParentId) {
+  try {
+    await sendMessage('SET_TAB_PARENT', { tabId, parentId: grandParentId });
+    showToast('タブを1つ上のレベルに移動しました', 'success');
+    await refreshTabTree();
+  } catch (err) {
+    console.error('Failed to move tab:', err);
+    showToast('移動に失敗しました', 'error');
+  }
+}
+
+// ===== タブ名カスタム編集 =====
+
+// タブ名を編集
+async function editTabName(tab) {
+  const currentName = state.customTabNames[tab.id] || tab.title;
+  const newName = prompt(`タブ名を編集:\n\n現在: ${currentName}\n\n※ 空白で削除`, currentName);
+
+  if (newName === null) return; // キャンセル
+
+  if (newName.trim() === '') {
+    // 名前をリセット
+    delete state.customTabNames[tab.id];
+    delete state.tabCustomNamesByUrl[tab.url];
+    try {
+      localStorage.removeItem(`ttm-custom-name-${tab.id}`);
+      localStorage.removeItem(`ttm-custom-name-url-${tab.url}`);
+    } catch {}
+    showToast('タブ名をリセットしました', 'success');
+  } else {
+    // 新しい名前を設定
+    state.customTabNames[tab.id] = newName.trim();
+    state.tabCustomNamesByUrl[tab.url] = newName.trim();
+    try {
+      localStorage.setItem(`ttm-custom-name-${tab.id}`, newName.trim());
+      localStorage.setItem(`ttm-custom-name-url-${tab.url}`, newName.trim());
+    } catch {}
+    showToast('タブ名を更新しました', 'success');
+  }
+
+  renderTabTree();
+}
+
+// カスタム名を取得（存在すれば返す）
+function getTabDisplayName(tab) {
+  // 1. tabIdで保存されたカスタム名
+  if (state.customTabNames[tab.id]) {
+    return state.customTabNames[tab.id];
+  }
+  // 2. URLで保存されたカスタム名
+  if (state.tabCustomNamesByUrl[tab.url]) {
+    return state.tabCustomNamesByUrl[tab.url];
+  }
+  // 3. デフォルトタイトル
+  return tab.title || '(タイトルなし)';
 }
 
 // タブ操作
 async function activateTab(tabId, windowId) {
   try {
+    // 最近開いた時刻を記録（最近開いた順ソート用）
+    state.tabActivationTime[tabId] = Date.now();
+    try { localStorage.setItem(`ttm-tab-activation-${tabId}`, state.tabActivationTime[tabId]); } catch {}
+
     await sendMessage('ACTIVATE_TAB', { tabId, windowId });
   } catch (e) {
     console.error('Failed to activate tab:', e);
@@ -576,15 +801,29 @@ function setupDragAndDrop(item, tab) {
     const y = e.clientY - rect.top;
     const h = rect.height;
 
-    if (y >= h * 0.25 && y <= h * 0.75) {
-      // ドロップ先の子タブにする
-      await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId: tab.id });
-    } else {
-      // ドロップ先と同じ親にする
-      const parentId = state.tabParents[tab.id] || null;
-      await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId });
+    const draggedTab = state.tabs.find(t => t.id === dragTabId);
+    if (!draggedTab) return;
+
+    try {
+      if (y >= h * 0.25 && y <= h * 0.75) {
+        // ドロップ先の子タブにする
+        await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId: tab.id });
+      } else {
+        // ドロップ先と同じ親にする
+        const parentId = state.tabParents[tab.id] || null;
+        await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId });
+
+        // 同じ親の場合、タブ位置も同期
+        if (draggedTab.windowId === tab.windowId) {
+          const targetIndex = y < h * 0.25 ? tab.index : tab.index + 1;
+          await chrome.tabs.move(dragTabId, { index: targetIndex });
+        }
+      }
+      await refreshTabTree();
+    } catch (err) {
+      console.error('Failed to reorder tab:', err);
+      showToast('タブの移動に失敗しました', 'error');
     }
-    await refreshTabTree();
   });
 }
 
@@ -598,6 +837,52 @@ async function loadTabs() {
   state.tabs = tabs.sort((a, b) => a.index - b.index);
   state.activeTabId = currentTab[0]?.id || null;
   state.currentWindowId = tabs[0]?.windowId || null;
+
+  // 最近開いた時刻を復元
+  tabs.forEach(tab => {
+    try {
+      const stored = localStorage.getItem(`ttm-tab-activation-${tab.id}`);
+      if (stored) state.tabActivationTime[tab.id] = parseInt(stored, 10);
+    } catch {}
+  });
+
+  // カスタム名を復元（tabId経由）
+  tabs.forEach(tab => {
+    try {
+      const customName = localStorage.getItem(`ttm-custom-name-${tab.id}`);
+      if (customName) state.customTabNames[tab.id] = customName;
+    } catch {}
+  });
+
+  // カスタム名を復元（URL経由：同じURLの再訪時用）
+  tabs.forEach(tab => {
+    try {
+      const customNameByUrl = localStorage.getItem(`ttm-custom-name-url-${tab.url}`);
+      if (customNameByUrl) {
+        state.tabCustomNamesByUrl[tab.url] = customNameByUrl;
+        // tabIdがない場合、URLから設定
+        if (!state.customTabNames[tab.id]) {
+          state.customTabNames[tab.id] = customNameByUrl;
+        }
+      }
+    } catch {}
+  });
+
+  // グループ情報を取得
+  try {
+    const groups = await chrome.tabGroups.query({ windowId: state.currentWindowId });
+    state.tabGroupMap = {};
+    groups.forEach(group => {
+      // グループ内のタブを取得して紐づける
+      chrome.tabs.query({ groupId: group.id }).then(groupTabs => {
+        groupTabs.forEach(t => {
+          state.tabGroupMap[t.id] = group.id;
+        });
+      });
+    });
+  } catch {
+    state.tabGroupMap = {};
+  }
 
   try {
     const resp = await sendMessage('GET_TAB_PARENTS');
