@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tree Tab Manager</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <!-- ヘッダー -->
+  <header class="header">
+    <div class="header-title">
+      <svg class="header-icon" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+      </svg>
+      <span class="header-title-text">Tree Tab Manager</span>
+    </div>
+  </header>
+
+  <!-- タブナビゲーション -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-panel="tabs">
+      <svg viewBox="0 0 20 20" fill="currentColor">
+        <path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/>
+      </svg>
+      タブ
+    </button>
+    <button class="tab-btn" data-panel="history">
+      <svg viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+      </svg>
+      履歴
+    </button>
+    <button class="tab-btn" data-panel="bookmarks">
+      <svg viewBox="0 0 20 20" fill="currentColor">
+        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
+      </svg>
+      お気に入り
+    </button>
+  </nav>
+
+  <!-- タブパネル -->
+  <div id="panel-tabs" class="panel active">
+    <!-- ツールバー -->
+    <div class="toolbar">
+      <button class="toolbar-btn primary" id="btn-new-tab" title="新しいタブ">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+        </svg>
+        新しいタブ
+      </button>
+      <button class="toolbar-btn" id="btn-toggle-pinned" title="固定タブを表示/非表示">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6z"/>
+        </svg>
+        <span id="pinned-count-label" class="pinned-count-label">0</span>
+      </button>
+      <div class="toolbar-right">
+        <button class="toolbar-btn" id="btn-display-mode" title="表示モード切替">
+          <!-- JS で動的に差し替える -->
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="btn-save-session" title="セッションを保存">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="btn-load-session" title="セッションを呼び出し">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+            <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="btn-collapse-all" title="すべて折りたたむ">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="btn-expand-all" title="すべて展開">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- タブツリー表示エリア -->
+    <div class="tree-container" id="tab-tree">
+      <div class="loading">読み込み中...</div>
+    </div>
+  </div>
+
+  <!-- 履歴パネル -->
+  <div id="panel-history" class="panel">
+    <div class="search-bar">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+      </svg>
+      <input type="text" id="history-search" placeholder="履歴を検索..." class="search-input">
+    </div>
+    <div class="list-container" id="history-list">
+      <div class="loading">読み込み中...</div>
+    </div>
+  </div>
+
+  <!-- お気に入りパネル -->
+  <div id="panel-bookmarks" class="panel">
+    <div class="sort-bar">
+      <span class="sort-label">並び順:</span>
+      <div class="sort-buttons">
+        <button class="sort-btn active" data-sort="recent-used">最近利用</button>
+        <button class="sort-btn" data-sort="recent-added">最近追加</button>
+        <button class="sort-btn" data-sort="most-visited">頻度順</button>
+        <button class="sort-btn" data-sort="tree">ツリー</button>
+      </div>
+    </div>
+    <div class="search-bar">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+      </svg>
+      <input type="text" id="bookmark-search" placeholder="お気に入りを検索..." class="search-input">
+    </div>
+    <div class="list-container" id="bookmark-list">
+      <div class="loading">読み込み中...</div>
+    </div>
+  </div>
+
+  <!-- セッション保存モーダル -->
+  <div id="modal-save-session" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>セッションを保存</h3>
+        <button class="modal-close" data-modal="modal-save-session">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label for="session-name-input">セッション名</label>
+        <input type="text" id="session-name-input" placeholder="セッション名を入力..." class="modal-input">
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-modal="modal-save-session">キャンセル</button>
+        <button class="btn-primary" id="btn-confirm-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- セッション呼び出しモーダル -->
+  <div id="modal-load-session" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>セッションを呼び出し</h3>
+        <button class="modal-close" data-modal="modal-load-session">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="session-list" class="session-list">
+          <div class="loading">読み込み中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- コンテキストメニュー -->
+  <div id="context-menu" class="context-menu hidden">
+    <ul id="context-menu-items"></ul>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="panel.js"></script>
+</body>
+</html>
