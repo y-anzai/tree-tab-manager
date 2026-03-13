@@ -239,13 +239,37 @@ function showContextMenu(x, y, items) {
       contextMenuItems.appendChild(li);
       return;
     }
+
+    // カラー行（グループ色選択など）
+    if (item.colorRow) {
+      const li = document.createElement('li');
+      li.className = 'context-menu-color-row';
+      if (item.label) {
+        const lbl = document.createElement('span');
+        lbl.className = 'context-menu-color-label';
+        lbl.textContent = item.label;
+        li.appendChild(lbl);
+      }
+      item.colors.forEach(color => {
+        const btn = document.createElement('button');
+        btn.className = `color-swatch group-dot-${color.name}${color.current ? ' active' : ''}`;
+        btn.title = color.label;
+        btn.addEventListener('click', () => { hideContextMenu(); color.action(); });
+        li.appendChild(btn);
+      });
+      contextMenuItems.appendChild(li);
+      return;
+    }
+
     const li = document.createElement('li');
-    li.className = `context-menu-item ${item.danger ? 'danger' : ''}`;
-    li.innerHTML = `${item.icon || ''}<span>${escapeHtml(item.label)}</span>`;
-    li.addEventListener('click', () => {
-      hideContextMenu();
-      item.action();
-    });
+    li.className = `context-menu-item${item.danger ? ' danger' : ''}${item.disabled ? ' disabled' : ''}`;
+    li.innerHTML = `${item.icon || ''}<span>${escapeHtml(item.label)}</span>${item.hint ? `<span class="context-menu-hint">${escapeHtml(item.hint)}</span>` : ''}`;
+    if (!item.disabled) {
+      li.addEventListener('click', () => {
+        hideContextMenu();
+        item.action();
+      });
+    }
     contextMenuItems.appendChild(li);
   });
 
@@ -315,6 +339,19 @@ function buildTabTree(tabs, parents) {
 }
 
 // ===== タブグループ関連 =====
+
+// Chrome タブグループの利用可能カラー
+const GROUP_COLORS = [
+  { name: 'grey',   label: 'グレー'   },
+  { name: 'blue',   label: 'ブルー'   },
+  { name: 'red',    label: 'レッド'   },
+  { name: 'yellow', label: 'イエロー' },
+  { name: 'green',  label: 'グリーン' },
+  { name: 'pink',   label: 'ピンク'   },
+  { name: 'purple', label: 'パープル' },
+  { name: 'cyan',   label: 'シアン'   },
+  { name: 'orange', label: 'オレンジ' },
+];
 
 // 任意のタブサブセットからサブツリーを構築（グループ内・未グループの両方で使用）
 function buildSubTree(tabSubset, parents) {
@@ -426,6 +463,25 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
   const xIcon = `<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`;
 
   showContextMenu(x, y, [
+    // 色選択スウォッチ行
+    {
+      colorRow: true,
+      label: '色:',
+      colors: GROUP_COLORS.map(c => ({
+        name: c.name,
+        label: c.label,
+        current: c.name === groupInfo?.color,
+        action: async () => {
+          try {
+            await chrome.tabGroups.update(groupId, { color: c.name });
+            await refreshTabTree();
+          } catch {
+            showToast('色の変更に失敗しました', 'error');
+          }
+        }
+      }))
+    },
+    { separator: true },
     {
       label: 'グループ名を変更',
       icon: pencilIcon,
@@ -699,28 +755,50 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
 function showTabContextMenu(x, y, tab) {
   // 親タブ（子タブがある）かどうか（state.tabParents から正確に判定）
   const hasChildren = state.tabs.some(t => state.tabParents[t.id] === tab.id);
+  // 最近開いた順モードではツリー操作を非表示にする
+  const isRecentMode = state.tabSortMode === 'recent';
+
+  const ICON = {
+    pin:    `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>`,
+    child:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>`,
+    ungroup:`<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    tag:    `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>`,
+    down:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    lift:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>`,
+    trash:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+    left:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>`,
+    domain: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v1h1a2 2 0 012 2v5a2 2 0 01-2 2H4a2 2 0 01-2-2v-5a2 2 0 012-2h1zm8-2v1H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>`,
+    up:     `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>`,
+    pencil: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
+    copy:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/><path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`,
+    close:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+  };
 
   const menuItems = [
+    // ─── 基本操作（全モード共通）───
     {
       label: tab.pinned ? '固定を解除' : 'タブを固定',
-      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>`,
+      icon: ICON.pin,
       action: () => toggleTabPin(tab.id, !tab.pinned)
     },
     {
       label: '子タブとして新しいタブを開く',
-      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>`,
+      icon: ICON.child,
+      // 最近開いた順モードではツリー構造が見えないためグレーアウト
+      disabled: isRecentMode,
+      hint: isRecentMode ? 'ツリーモードのみ' : undefined,
       action: () => createChildTab(tab.id)
     }
   ];
 
-  // タブグループ操作（固定タブ以外）
+  // ─── グループ操作（固定タブ・全モード共通）───
   if (!tab.pinned) {
     const tabGroupId = state.tabGroupMap[tab.id];
     if (tabGroupId !== undefined) {
-      // グループ内のタブ → グループから除外
+      // グループ内のタブ → 除外のみ
       menuItems.push({
         label: 'グループから除外',
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+        icon: ICON.ungroup,
         action: async () => {
           try {
             await chrome.tabs.ungroup([tab.id]);
@@ -732,10 +810,28 @@ function showTabContextMenu(x, y, tab) {
         }
       });
     } else {
-      // グループ外のタブ → 新しいグループを作成
+      // グループ外のタブ → 既存グループに追加 + 新規作成
+      const existingGroups = Object.values(state.tabGroupInfo);
+      if (existingGroups.length > 0) {
+        existingGroups.forEach(group => {
+          menuItems.push({
+            label: `「${group.title || 'グループ'}」に追加`,
+            icon: `<span class="tab-group-dot-sm group-dot-${group.color}"></span>`,
+            action: async () => {
+              try {
+                await chrome.tabs.group({ tabIds: [tab.id], groupId: group.id });
+                await refreshTabTree();
+                showToast(`グループに追加しました`, 'success');
+              } catch {
+                showToast('グループへの追加に失敗しました', 'error');
+              }
+            }
+          });
+        });
+      }
       menuItems.push({
         label: '新しいグループを作成',
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>`,
+        icon: ICON.tag,
         action: async () => {
           try {
             const gid = await chrome.tabs.group({ tabIds: [tab.id] });
@@ -753,101 +849,92 @@ function showTabContextMenu(x, y, tab) {
     }
   }
 
-  // これより下のタブを子タブにする（非固定タブで、下にタブがある場合）
-  if (!tab.pinned) {
-    const belowTabs = state.tabs.filter(t => !t.pinned && t.index > tab.index);
-    if (belowTabs.length > 0) {
+  // ─── ツリー専用操作（ツリーモードのみ表示）───
+  if (!isRecentMode) {
+    // これより下のタブを子タブにする
+    if (!tab.pinned) {
+      const belowTabs = state.tabs.filter(t => !t.pinned && t.index > tab.index);
+      if (belowTabs.length > 0) {
+        menuItems.push({
+          label: `これより下のタブを子タブにする (${belowTabs.length}個)`,
+          icon: ICON.down,
+          action: () => makeTabsBelowChildren(tab)
+        });
+      }
+    }
+
+    // 親タブの場合の追加操作 / 子タブ設定
+    if (hasChildren) {
+      menuItems.push(
+        { separator: true },
+        {
+          label: '子ツリーを1つ上に移動',
+          icon: ICON.lift,
+          action: () => moveChildrenToParentLevel(tab.id)
+        },
+        {
+          label: `このタブと子ツリーを削除 (${countDescendants(tab) + 1}個)`,
+          danger: true,
+          icon: ICON.trash,
+          action: () => closeTabWithChildren(tab.id)
+        }
+      );
+    } else {
       menuItems.push({
-        label: `これより下のタブを子タブにする (${belowTabs.length}個)`,
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
-        action: () => makeTabsBelowChildren(tab)
+        label: '親タブの子にする',
+        icon: ICON.left,
+        action: () => moveToParent(tab.id)
+      });
+    }
+
+    // ドメイン集約
+    try {
+      const tabUrl = new URL(tab.url);
+      const sameDomainTabs = state.tabs.filter(t => {
+        try { return new URL(t.url).hostname === tabUrl.hostname && t.id !== tab.id && !t.pinned; }
+        catch { return false; }
+      });
+      if (sameDomainTabs.length > 0) {
+        menuItems.push({
+          label: `同じドメインのタブをまとめる (${sameDomainTabs.length}個)`,
+          icon: ICON.domain,
+          action: () => aggregateSameDomain(tab.id, sameDomainTabs)
+        });
+      }
+    } catch {}
+
+    // 1つ上の階層へ移動
+    const parentTabId = state.tabParents[tab.id];
+    if (parentTabId && state.tabs.find(t => t.id === parentTabId)) {
+      const grandParentId = state.tabParents[parentTabId] || null;
+      menuItems.push({
+        label: '1つ上のツリーの子にする',
+        icon: ICON.up,
+        action: () => moveToGrandParentLevel(tab.id, grandParentId)
       });
     }
   }
 
-  // 親タブの場合、追加メニュー
-  if (hasChildren) {
-    menuItems.push(
-      { separator: true },
-      {
-        label: '子ツリーを1つ上に移動',
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>`,
-        action: () => moveChildrenToParentLevel(tab.id)
-      },
-      {
-        label: `このタブと子ツリーを削除 (${countDescendants(tab) + 1}個)`,
-        danger: true,
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
-        action: () => closeTabWithChildren(tab.id)
-      }
-    );
-  } else {
-    menuItems.push(
-      {
-        label: '親タブの子にする',
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>`,
-        action: () => moveToParent(tab.id)
-      }
-    );
-  }
-
-  // ドメイン集約（同じドメインのタブを子にする）
-  try {
-    const tabUrl = new URL(tab.url);
-    const sameDomainTabs = state.tabs.filter(t => {
-      try {
-        return new URL(t.url).hostname === tabUrl.hostname && t.id !== tab.id && !t.pinned;
-      } catch {
-        return false;
-      }
-    });
-
-    if (sameDomainTabs.length > 0) {
-      menuItems.push(
-        {
-          label: `同じドメインのタブをまとめる (${sameDomainTabs.length}個)`,
-          icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v1h1a2 2 0 012 2v5a2 2 0 01-2 2H4a2 2 0 01-2-2v-5a2 2 0 012-2h1zm8-2v1H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>`,
-          action: () => aggregateSameDomain(tab.id, sameDomainTabs)
-        }
-      );
-    }
-  } catch {}
-
-  // 階層移動：1つ上のツリーの子にする
-  const parentTabId = state.tabParents[tab.id];
-  if (parentTabId) {
-    const parentTab = state.tabs.find(t => t.id === parentTabId);
-    if (parentTab) {
-      const grandParentId = state.tabParents[parentTabId] || null;
-      menuItems.push(
-        {
-          label: '1つ上のツリーの子にする',
-          icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>`,
-          action: () => moveToGrandParentLevel(tab.id, grandParentId)
-        }
-      );
-    }
-  }
-
+  // ─── 共通操作（全モード）───
   menuItems.push(
     { separator: true },
     {
       label: '名前を編集',
-      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
+      icon: ICON.pencil,
       action: () => editTabName(tab)
     },
     {
       label: 'URLをコピー',
-      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/><path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`,
+      icon: ICON.copy,
       action: () => {
         navigator.clipboard.writeText(tab.url).then(() => showToast('URLをコピーしました', 'success'));
       }
     },
     { separator: true },
     {
-      label: hasChildren ? 'このタブを閉じる' : 'タブを閉じる',
+      label: hasChildren && !isRecentMode ? 'このタブを閉じる' : 'タブを閉じる',
       danger: true,
-      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+      icon: ICON.close,
       action: () => closeTab(tab.id)
     }
   );
@@ -1140,27 +1227,53 @@ function setupDragAndDrop(item, tab) {
 
     try {
       if (y >= h * 0.25 && y <= h * 0.75) {
-        // ドロップ先の子タブにする
+        // ─── 内側ドロップ: ドロップ先の子タブにする ───
         await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId: tab.id });
-        // Chrome本体のタブ位置も同期: 親の直後に移動
+
+        // Chrome本体のタブ位置を同期（親の直後に移動）
+        // ドラッグ元が親より前にある場合、親は1つ前にずれるので +0、後ろなら +1
         if (draggedTab.windowId === tab.windowId) {
-          await chrome.tabs.move(dragTabId, { index: tab.index + 1 });
+          const insideIndex = draggedTab.index < tab.index ? tab.index : tab.index + 1;
+          try {
+            await chrome.tabs.move(dragTabId, { index: insideIndex });
+          } catch {
+            // グループ境界制約などで位置同期できない場合はスキップ
+          }
         }
       } else {
-        // ドロップ先と同じ親にする
+        // ─── 上/下ドロップ: ドロップ先と同じ親にする ───
         const parentId = state.tabParents[tab.id] || null;
         await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId });
 
-        // 同じ親の場合、タブ位置も同期
+        // Chrome本体のタブ位置を同期
+        // chrome.tabs.move() はタブ除去後の配列に対してインデックスを適用するため、
+        // ドラッグ元の元位置を考慮して計算する必要がある
         if (draggedTab.windowId === tab.windowId) {
-          const targetIndex = y < h * 0.25 ? tab.index : tab.index + 1;
-          await chrome.tabs.move(dragTabId, { index: targetIndex });
+          let targetIndex;
+          if (y < h * 0.25) {
+            // 上に挿入: ターゲットの直前
+            // ドラッグ元が前 → 除去でターゲットが1つ前にずれる → tab.index - 1
+            // ドラッグ元が後 → ターゲット位置そのまま → tab.index
+            targetIndex = draggedTab.index < tab.index ? tab.index - 1 : tab.index;
+          } else {
+            // 下に挿入: ターゲットの直後
+            // ドラッグ元が前 → 除去でターゲットが1つ前にずれる → tab.index（ずれた位置の次）
+            // ドラッグ元が後 → ターゲット位置そのまま → tab.index + 1
+            targetIndex = draggedTab.index < tab.index ? tab.index : tab.index + 1;
+          }
+          try {
+            await chrome.tabs.move(dragTabId, { index: targetIndex });
+          } catch {
+            // グループ境界制約などで位置同期できない場合はスキップ
+          }
         }
       }
-      await refreshTabTree();
     } catch (err) {
       console.error('Failed to reorder tab:', err);
       showToast('タブの移動に失敗しました', 'error');
+    } finally {
+      // 成功・失敗に関わらず必ずツリーを更新（インデックス陳腐化を防ぐ）
+      await refreshTabTree();
     }
   });
 }

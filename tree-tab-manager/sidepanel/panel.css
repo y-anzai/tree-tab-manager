@@ -1108,6 +1108,57 @@ body.mode-mini .header-title-text { display: none; }
   margin: 4px 0;
 }
 
+/* グレーアウト（無効）項目 */
+.context-menu-item.disabled {
+  opacity: 0.38;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* 補足ヒント（右端に小さく表示） */
+.context-menu-hint {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-left: 8px;
+}
+
+/* グループ色選択スウォッチ行 */
+.context-menu-color-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 6px;
+}
+
+.context-menu-color-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.color-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+  flex-shrink: 0;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.color-swatch:hover {
+  transform: scale(1.3);
+}
+
+.color-swatch.active {
+  border-color: var(--text-primary);
+}
+
 /* ===== トースト通知 ===== */
 .toast {
   position: fixed;
