@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tree Tab Manager</title>
+  <title data-i18n="extName">Tree Tab Manager</title>
   <link rel="stylesheet" href="panel.css">
 </head>
 
@@ -16,7 +16,7 @@
         <path
           d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
       </svg>
-      <span class="header-title-text">Tree Tab Manager</span>
+      <span class="header-title-text" data-i18n="extName">Tree Tab Manager</span>
     </div>
   </header>
 
@@ -49,7 +49,7 @@
   <div id="panel-tabs" class="panel active">
     <!-- ツールバー -->
     <div class="toolbar">
-      <button class="toolbar-btn" id="btn-new-tab" title="新しいタブ">
+      <button class="toolbar-btn" id="btn-new-tab" title="新しいタブ" data-i18n-title="toolbarNewTab">
         <svg viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd"
             d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
@@ -57,7 +57,7 @@
         </svg>
         新しいタブ
       </button>
-      <button class="toolbar-btn" id="btn-toggle-pinned" title="固定タブを表示/非表示">
+      <button class="toolbar-btn" id="btn-toggle-pinned" title="固定タブを表示/非表示" data-i18n-title="toolbarTogglePinned">
         <svg viewBox="0 0 20 20" fill="currentColor">
           <path
             d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6z" />
@@ -65,7 +65,7 @@
         <span id="pinned-count-label" class="pinned-count-label">0</span>
       </button>
       <div class="toolbar-right">
-        <button class="toolbar-btn" id="btn-display-mode" title="表示モード切替">
+        <button class="toolbar-btn" id="btn-display-mode" title="表示モード切替" data-i18n-title="displayMode">
           <!-- JS で動的に差し替える -->
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd"
@@ -73,13 +73,13 @@
               clip-rule="evenodd" />
           </svg>
         </button>
-        <button class="toolbar-btn" id="btn-save-session" title="セッションを保存">
+        <button class="toolbar-btn" id="btn-save-session" title="セッションを保存" data-i18n-title="toolbarSaveSession">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path
               d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
           </svg>
         </button>
-        <button class="toolbar-btn" id="btn-load-session" title="セッションを呼び出し">
+        <button class="toolbar-btn" id="btn-load-session" title="セッションを呼び出し" data-i18n-title="toolbarLoadSession">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
             <path fill-rule="evenodd"
@@ -87,21 +87,21 @@
               clip-rule="evenodd" />
           </svg>
         </button>
-        <button class="toolbar-btn" id="btn-sort-mode" title="並び順: ツリー">
+        <button class="toolbar-btn" id="btn-sort-mode" title="並び順: ツリー" data-i18n-title="sortTree">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
               clip-rule="evenodd" />
           </svg>
         </button>
-        <button class="toolbar-btn" id="btn-collapse-all" title="すべて折りたたむ">
+        <button class="toolbar-btn" id="btn-collapse-all" title="すべて折りたたむ" data-i18n-title="toolbarCollapseAll">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd"
               d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
               clip-rule="evenodd" />
           </svg>
         </button>
-        <button class="toolbar-btn" id="btn-expand-all" title="すべて展開">
+        <button class="toolbar-btn" id="btn-expand-all" title="すべて展開" data-i18n-title="toolbarExpandAll">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd"
               d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
@@ -113,7 +113,7 @@
 
     <!-- タブツリー表示エリア -->
     <div class="tree-container" id="tab-tree">
-      <div class="loading">読み込み中...</div>
+      <div class="loading" data-i18n="msgLoading">読み込み中...</div>
     </div>
   </div>
 
@@ -125,22 +125,23 @@
           d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
           clip-rule="evenodd" />
       </svg>
-      <input type="text" id="history-search" placeholder="履歴を検索..." class="search-input">
+      <input type="text" id="history-search" placeholder="履歴を検索..." data-i18n-placeholder="historySearchPlaceholder"
+        class="search-input">
     </div>
     <div class="list-container" id="history-list">
-      <div class="loading">読み込み中...</div>
+      <div class="loading" data-i18n="msgLoading">読み込み中...</div>
     </div>
   </div>
 
   <!-- お気に入りパネル -->
   <div id="panel-bookmarks" class="panel">
     <div class="sort-bar">
-      <span class="sort-label">並び順:</span>
+      <span class="sort-label" data-i18n="sortLabel">並び順:</span>
       <div class="sort-buttons">
-        <button class="sort-btn active" data-sort="recent-used">最近利用</button>
-        <button class="sort-btn" data-sort="recent-added">最近追加</button>
-        <button class="sort-btn" data-sort="most-visited">頻度順</button>
-        <button class="sort-btn" data-sort="tree">ツリー</button>
+        <button class="sort-btn active" data-sort="recent-used" data-i18n="sortRecentUsed">最近利用</button>
+        <button class="sort-btn" data-sort="recent-added" data-i18n="sortRecentAdded">最近追加</button>
+        <button class="sort-btn" data-sort="most-visited" data-i18n="sortMostVisited">頻度順</button>
+        <button class="sort-btn" data-sort="tree" data-i18n="sortTree">ツリー</button>
       </div>
     </div>
     <div class="search-bar">
@@ -149,20 +150,45 @@
           d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
           clip-rule="evenodd" />
       </svg>
-      <input type="text" id="bookmark-search" placeholder="お気に入りを検索..." class="search-input">
+      <input type="text" id="bookmark-search" placeholder="お気に入りを検索..."
+        data-i18n-placeholder="bookmarkSearchPlaceholder" class="search-input">
     </div>
     <div class="list-container" id="bookmark-list">
-      <div class="loading">読み込み中...</div>
+      <div class="loading" data-i18n="msgLoading">読み込み中...</div>
     </div>
   </div>
 
   <!-- 設定パネル -->
   <div id="panel-settings" class="panel">
     <div class="settings-container">
-      <h2 class="settings-title">タブの表示設定</h2>
-      <p class="settings-desc">ドラッグ＆ドロップで並び替え、チェックボックスで表示/非表示を切り替えます。</p>
+      <h2 class="settings-title" data-i18n="settingsTitle">タブの表示設定</h2>
+      <p class="settings-desc" data-i18n="settingsDesc">ドラッグ＆ドロップで並び替え、チェックボックスで表示/非表示を切り替えます。</p>
       <div id="tab-visibility-list" class="settings-list">
         <!-- JSで動的に生成 -->
+      </div>
+
+      <hr class="settings-divider">
+      <h3 class="settings-subtitle" data-i18n="settingsOtherTitle">その他の設定</h3>
+
+      <div class="settings-list" id="other-settings-list">
+        <label class="settings-item-normal">
+          <div class="settings-item-label" data-i18n="settingsTabDisplayMode">タブの表示モード</div>
+          <select id="setting-display-mode" class="settings-select">
+            <option value="full" data-i18n="modeFull">標準</option>
+            <option value="compact" data-i18n="modeCompact">コンパクト</option>
+            <option value="mini" data-i18n="modeMini">ミニ</option>
+          </select>
+        </label>
+
+        <label class="settings-item-normal">
+          <div class="settings-item-label" data-i18n="settingsHistoryRecentlyClosed">履歴: 最近閉じたタブを表示</div>
+          <input type="checkbox" id="setting-history-recent" class="settings-checkbox">
+        </label>
+
+        <label class="settings-item-normal">
+          <div class="settings-item-label" data-i18n="settingsBookmarkVisitCount">お気に入り: 頻度順で回数を表示</div>
+          <input type="checkbox" id="setting-bookmark-visit" class="settings-checkbox">
+        </label>
       </div>
     </div>
   </div>
@@ -171,16 +197,17 @@
   <div id="modal-save-session" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>セッションを保存</h3>
+        <h3 data-i18n="modalSaveSessionTitle">セッションを保存</h3>
         <button class="modal-close" data-modal="modal-save-session">&times;</button>
       </div>
       <div class="modal-body">
-        <label for="session-name-input">セッション名</label>
-        <input type="text" id="session-name-input" placeholder="セッション名を入力..." class="modal-input">
+        <label for="session-name-input" data-i18n="sessionNamePlaceholder">セッション名</label>
+        <input type="text" id="session-name-input" placeholder="セッション名を入力..."
+          data-i18n-placeholder="sessionNamePlaceholder" class="modal-input">
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" data-modal="modal-save-session">キャンセル</button>
-        <button class="btn-primary" id="btn-confirm-save">保存</button>
+        <button class="btn-secondary" data-modal="modal-save-session" data-i18n="btnCancel">キャンセル</button>
+        <button class="btn-primary" id="btn-confirm-save" data-i18n="btnSave">保存</button>
       </div>
     </div>
   </div>
@@ -189,12 +216,12 @@
   <div id="modal-load-session" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>セッションを呼び出し</h3>
+        <h3 data-i18n="modalLoadSessionTitle">セッションを呼び出し</h3>
         <button class="modal-close" data-modal="modal-load-session">&times;</button>
       </div>
       <div class="modal-body">
         <div id="session-list" class="session-list">
-          <div class="loading">読み込み中...</div>
+          <div class="loading" data-i18n="msgLoading">読み込み中...</div>
         </div>
       </div>
     </div>

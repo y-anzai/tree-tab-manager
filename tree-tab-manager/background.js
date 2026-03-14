@@ -12,7 +12,7 @@ chrome.runtime.onInstalled.addListener(() => {
   // コンテキストメニュー（右クリックメニュー）を作成
   chrome.contextMenus.create({
     id: "open-side-panel",
-    title: "Tree Tab Manager を開く",
+    title: chrome.i18n.getMessage('openContextMenu'),
     contexts: ["all"]
   });
 });

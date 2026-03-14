@@ -1,0 +1,396 @@
+{
+  "extName": {
+    "message": "Tree Tab Manager"
+  },
+  "extDesc": {
+    "message": "タブをツリー形式で管理するサイドバー拡張機能"
+  },
+  "openContextMenu": {
+    "message": "Tree Tab Manager を開く"
+  },
+  "navTabs": {
+    "message": "タブ"
+  },
+  "navHistory": {
+    "message": "履歴"
+  },
+  "navBookmarks": {
+    "message": "お気に入り"
+  },
+  "navSettings": {
+    "message": "設定"
+  },
+  "toolbarNewTab": {
+    "message": "新しいタブ"
+  },
+  "toolbarTogglePinned": {
+    "message": "固定タブを表示/非表示"
+  },
+  "toolbarSaveSession": {
+    "message": "セッションを保存"
+  },
+  "toolbarLoadSession": {
+    "message": "セッションを呼び出し"
+  },
+  "toolbarCollapseAll": {
+    "message": "すべて折りたたむ"
+  },
+  "toolbarExpandAll": {
+    "message": "すべて展開"
+  },
+  "msgLoading": {
+    "message": "読み込み中..."
+  },
+  "historySearchPlaceholder": {
+    "message": "履歴を検索..."
+  },
+  "sortLabel": {
+    "message": "並び順:"
+  },
+  "sortRecentUsed": {
+    "message": "最近利用"
+  },
+  "sortRecentAdded": {
+    "message": "最近追加"
+  },
+  "sortMostVisited": {
+    "message": "頻度順"
+  },
+  "sortTree": {
+    "message": "ツリー"
+  },
+  "bookmarkSearchPlaceholder": {
+    "message": "お気に入りを検索..."
+  },
+  "settingsTitle": {
+    "message": "タブの表示設定"
+  },
+  "settingsDesc": {
+    "message": "ドラッグ＆ドロップで並び替え、チェックボックスで表示/非表示を切り替えます。"
+  },
+  "modalSaveSessionTitle": {
+    "message": "セッションを保存"
+  },
+  "sessionNamePlaceholder": {
+    "message": "セッション名を入力..."
+  },
+  "btnCancel": {
+    "message": "キャンセル"
+  },
+  "btnSave": {
+    "message": "保存"
+  },
+  "modalLoadSessionTitle": {
+    "message": "セッションを呼び出し"
+  },
+  "sessionCount": {
+    "message": "$1タブ",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastPinned": {
+    "message": "タブを固定しました"
+  },
+  "toastUnpinned": {
+    "message": "固定を解除しました"
+  },
+  "toastSessionSaved": {
+    "message": "セッションを保存しました"
+  },
+  "toastSessionSaveFailed": {
+    "message": "保存に失敗しました"
+  },
+  "toastSessionRestored": {
+    "message": "セッションを復元しました"
+  },
+  "toastSessionRestoreFailed": {
+    "message": "復元に失敗しました"
+  },
+  "toastSessionDeleted": {
+    "message": "セッションを削除しました"
+  },
+  "toastHistoryDeleted": {
+    "message": "履歴から削除しました"
+  },
+  "toastUrlCopied": {
+    "message": "URLをコピーしました"
+  },
+  "toastBookmarkUpdated": {
+    "message": "ブックマークを更新しました"
+  },
+  "toastBookmarkUpdateFailed": {
+    "message": "更新に失敗しました"
+  },
+  "toastBookmarkDeleted": {
+    "message": "ブックマークを削除しました"
+  },
+  "toastBookmarkDeleteFailed": {
+    "message": "削除に失敗しました"
+  },
+  "toastTabNameReset": {
+    "message": "タブ名をリセットしました"
+  },
+  "toastTabNameUpdated": {
+    "message": "タブ名を更新しました"
+  },
+  "toastTabMoveFailed": {
+    "message": "移動に失敗しました"
+  },
+  "toastTabReorderFailed": {
+    "message": "タブの移動に失敗しました"
+  },
+  "toastTabsGrouped": {
+    "message": "$1個のタブを子にしました",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastTabLevelUp": {
+    "message": "タブを1つ上のレベルに移動しました"
+  },
+  "promptEditTabName": {
+    "message": "タブ名を編集:\n\n現在: $1\n\n※ 空白で削除",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "promptEditGroup": {
+    "message": "グループ名を入力:",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "promptNewTitle": {
+    "message": "新しいタイトルを入力してください:"
+  },
+  "promptNewUrl": {
+    "message": "新しいURLを入力してください:"
+  },
+  "confirmDeleteBookmark": {
+    "message": "「$1」を削除しますか？",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "ctxOpenNewTab": {
+    "message": "新しいタブで開く"
+  },
+  "ctxCopyUrl": {
+    "message": "URLをコピー"
+  },
+  "ctxEdit": {
+    "message": "編集"
+  },
+  "ctxDelete": {
+    "message": "削除"
+  },
+  "ctxGroupTitle": {
+    "message": "グループ操作"
+  },
+  "ctxSelectColor": {
+    "message": "色を選択"
+  },
+  "colorGrey": {
+    "message": "グレー"
+  },
+  "colorBlue": {
+    "message": "ブルー"
+  },
+  "colorRed": {
+    "message": "レッド"
+  },
+  "colorYellow": {
+    "message": "イエロー"
+  },
+  "colorGreen": {
+    "message": "グリーン"
+  },
+  "colorPink": {
+    "message": "ピンク"
+  },
+  "colorPurple": {
+    "message": "パープル"
+  },
+  "colorCyan": {
+    "message": "シアン"
+  },
+  "colorOrange": {
+    "message": "オレンジ"
+  },
+  "ctxEditGroupName": {
+    "message": "グループ名を変更"
+  },
+  "ctxCurrentName": {
+    "message": "現在の名前: $1",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "ctxUngroup": {
+    "message": "グループを解除"
+  },
+  "ctxRemoveFromGroup": {
+    "message": "グループから除外"
+  },
+  "ctxNewGroup": {
+    "message": "+ 新しいグループを作成"
+  },
+  "ctxAddToGroup": {
+    "message": "「$1」に追加",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "ctxPinTab": {
+    "message": "タブを固定"
+  },
+  "ctxUnpinTab": {
+    "message": "固定を解除"
+  },
+  "ctxOpenChildTab": {
+    "message": "このタブの子として開く"
+  },
+  "ctxEditName": {
+    "message": "名前を編集"
+  },
+  "ctxCloseTab": {
+    "message": "タブを閉じる"
+  },
+  "ctxMakeChildren": {
+    "message": "これより下を子タブにする"
+  },
+  "ctxMoveTreeUp": {
+    "message": "子ツリーを1つ上に移動"
+  },
+  "ctxCloseTree": {
+    "message": "このタブと子ツリーを削除"
+  },
+  "ctxSetParent": {
+    "message": "親タブとして選択"
+  },
+  "ctxGroupDomain": {
+    "message": "このドメインをまとめる"
+  },
+  "ctxMoveToGrandparent": {
+    "message": "1つ上のツリーの子にする"
+  },
+  "emptyTabs": {
+    "message": "タブが見つかりません"
+  },
+  "emptySessions": {
+    "message": "保存されたセッションがありません"
+  },
+  "emptySessionLoadFail": {
+    "message": "読み込みに失敗しました"
+  },
+  "emptyHistory": {
+    "message": "履歴が見つかりません"
+  },
+  "emptyHistoryLoadFail": {
+    "message": "履歴の読み込みに失敗しました"
+  },
+  "emptyBookmarks": {
+    "message": "ブックマークが見つかりません"
+  },
+  "emptyBookmarkLoadFail": {
+    "message": "ブックマークの読み込みに失敗しました"
+  },
+  "timeJustNow": {
+    "message": "たった今"
+  },
+  "timeMinsAgo": {
+    "message": "$1分前",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "timeHoursAgo": {
+    "message": "$1時間前",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "timeDaysAgo": {
+    "message": "$1日前",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "timeToday": {
+    "message": "今日"
+  },
+  "timeYesterday": {
+    "message": "昨日"
+  },
+  "defaultTitle": {
+    "message": "(タイトルなし)"
+  },
+  "defaultFolder": {
+    "message": "フォルダ"
+  },
+  "settingsNotHideable": {
+    "message": "設定タブは非表示にできません"
+  },
+  "settingsToggle": {
+    "message": "表示/非表示"
+  },
+  "sessionDefaultName": {
+    "message": "セッション $1",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "settingsOtherTitle": {
+    "message": "その他の設定"
+  },
+  "settingsTabDisplayMode": {
+    "message": "タブの表示モード"
+  },
+  "settingsHistoryRecentlyClosed": {
+    "message": "履歴: 最近閉じたタブを表示"
+  },
+  "settingsBookmarkVisitCount": {
+    "message": "お気に入り: 頻度順で回数を表示"
+  },
+  "modeFull": {
+    "message": "標準"
+  },
+  "modeCompact": {
+    "message": "コンパクト"
+  },
+  "modeMini": {
+    "message": "ミニ"
+  },
+  "displayMode": {
+    "message": "表示モード切替"
+  },
+  "recentlyClosedHeader": {
+    "message": "最近閉じたタブ"
+  },
+  "historyListHeader": {
+    "message": "すべての履歴"
+  }
+}

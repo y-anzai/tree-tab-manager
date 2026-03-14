@@ -1,0 +1,396 @@
+{
+    "extName": {
+        "message": "Tree Tab Manager"
+    },
+    "extDesc": {
+        "message": "Sidebar extension for managing tabs in a tree structure"
+    },
+    "openContextMenu": {
+        "message": "Open Tree Tab Manager"
+    },
+    "navTabs": {
+        "message": "Tabs"
+    },
+    "navHistory": {
+        "message": "History"
+    },
+    "navBookmarks": {
+        "message": "Bookmarks"
+    },
+    "navSettings": {
+        "message": "Settings"
+    },
+    "toolbarNewTab": {
+        "message": "New Tab"
+    },
+    "toolbarTogglePinned": {
+        "message": "Toggle Pinned Tabs"
+    },
+    "toolbarSaveSession": {
+        "message": "Save Session"
+    },
+    "toolbarLoadSession": {
+        "message": "Load Session"
+    },
+    "toolbarCollapseAll": {
+        "message": "Collapse All"
+    },
+    "toolbarExpandAll": {
+        "message": "Expand All"
+    },
+    "msgLoading": {
+        "message": "Loading..."
+    },
+    "historySearchPlaceholder": {
+        "message": "Search history..."
+    },
+    "sortLabel": {
+        "message": "Sort by:"
+    },
+    "sortRecentUsed": {
+        "message": "Recently Used"
+    },
+    "sortRecentAdded": {
+        "message": "Recently Added"
+    },
+    "sortMostVisited": {
+        "message": "Most Visited"
+    },
+    "sortTree": {
+        "message": "Tree"
+    },
+    "bookmarkSearchPlaceholder": {
+        "message": "Search bookmarks..."
+    },
+    "settingsTitle": {
+        "message": "Tab Display Settings"
+    },
+    "settingsDesc": {
+        "message": "Drag & drop to reorder, use checkboxes to show/hide tabs."
+    },
+    "modalSaveSessionTitle": {
+        "message": "Save Session"
+    },
+    "sessionNamePlaceholder": {
+        "message": "Enter session name..."
+    },
+    "btnCancel": {
+        "message": "Cancel"
+    },
+    "btnSave": {
+        "message": "Save"
+    },
+    "modalLoadSessionTitle": {
+        "message": "Load Session"
+    },
+    "sessionCount": {
+        "message": "$1 tabs",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "toastPinned": {
+        "message": "Tab pinned"
+    },
+    "toastUnpinned": {
+        "message": "Tab unpinned"
+    },
+    "toastSessionSaved": {
+        "message": "Session saved"
+    },
+    "toastSessionSaveFailed": {
+        "message": "Failed to save session"
+    },
+    "toastSessionRestored": {
+        "message": "Session restored"
+    },
+    "toastSessionRestoreFailed": {
+        "message": "Failed to restore session"
+    },
+    "toastSessionDeleted": {
+        "message": "Session deleted"
+    },
+    "toastHistoryDeleted": {
+        "message": "Removed from history"
+    },
+    "toastUrlCopied": {
+        "message": "URL copied"
+    },
+    "toastBookmarkUpdated": {
+        "message": "Bookmark updated"
+    },
+    "toastBookmarkUpdateFailed": {
+        "message": "Failed to update bookmark"
+    },
+    "toastBookmarkDeleted": {
+        "message": "Bookmark deleted"
+    },
+    "toastBookmarkDeleteFailed": {
+        "message": "Failed to delete bookmark"
+    },
+    "toastTabNameReset": {
+        "message": "Tab name reset"
+    },
+    "toastTabNameUpdated": {
+        "message": "Tab name updated"
+    },
+    "toastTabMoveFailed": {
+        "message": "Failed to move tab"
+    },
+    "toastTabReorderFailed": {
+        "message": "Failed to reorder tab"
+    },
+    "toastTabsGrouped": {
+        "message": "Made $1 tabs children",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "toastTabLevelUp": {
+        "message": "Moved tab up one level"
+    },
+    "promptEditTabName": {
+        "message": "Edit tab name:\n\nCurrent: $1\n\n* Empty to reset",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "promptEditGroup": {
+        "message": "Enter group name:",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "promptNewTitle": {
+        "message": "Enter new title:"
+    },
+    "promptNewUrl": {
+        "message": "Enter new URL:"
+    },
+    "confirmDeleteBookmark": {
+        "message": "Delete \"$1\"?",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "ctxOpenNewTab": {
+        "message": "Open in new tab"
+    },
+    "ctxCopyUrl": {
+        "message": "Copy URL"
+    },
+    "ctxEdit": {
+        "message": "Edit"
+    },
+    "ctxDelete": {
+        "message": "Delete"
+    },
+    "ctxGroupTitle": {
+        "message": "Group Operations"
+    },
+    "ctxSelectColor": {
+        "message": "Select Color"
+    },
+    "colorGrey": {
+        "message": "Grey"
+    },
+    "colorBlue": {
+        "message": "Blue"
+    },
+    "colorRed": {
+        "message": "Red"
+    },
+    "colorYellow": {
+        "message": "Yellow"
+    },
+    "colorGreen": {
+        "message": "Green"
+    },
+    "colorPink": {
+        "message": "Pink"
+    },
+    "colorPurple": {
+        "message": "Purple"
+    },
+    "colorCyan": {
+        "message": "Cyan"
+    },
+    "colorOrange": {
+        "message": "Orange"
+    },
+    "ctxEditGroupName": {
+        "message": "Rename Group"
+    },
+    "ctxCurrentName": {
+        "message": "Current: $1",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "ctxUngroup": {
+        "message": "Ungroup"
+    },
+    "ctxRemoveFromGroup": {
+        "message": "Remove from group"
+    },
+    "ctxNewGroup": {
+        "message": "+ Create New Group"
+    },
+    "ctxAddToGroup": {
+        "message": "Add to \"$1\"",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "ctxPinTab": {
+        "message": "Pin Tab"
+    },
+    "ctxUnpinTab": {
+        "message": "Unpin Tab"
+    },
+    "ctxOpenChildTab": {
+        "message": "Open as child tab"
+    },
+    "ctxEditName": {
+        "message": "Edit Name"
+    },
+    "ctxCloseTab": {
+        "message": "Close Tab"
+    },
+    "ctxMakeChildren": {
+        "message": "Make below tabs children"
+    },
+    "ctxMoveTreeUp": {
+        "message": "Move child tree up"
+    },
+    "ctxCloseTree": {
+        "message": "Close tab and child tree"
+    },
+    "ctxSetParent": {
+        "message": "Set as parent"
+    },
+    "ctxGroupDomain": {
+        "message": "Group same domain"
+    },
+    "ctxMoveToGrandparent": {
+        "message": "Move to upper tree"
+    },
+    "emptyTabs": {
+        "message": "No tabs found"
+    },
+    "emptySessions": {
+        "message": "No saved sessions"
+    },
+    "emptySessionLoadFail": {
+        "message": "Failed to load sessions"
+    },
+    "emptyHistory": {
+        "message": "No history found"
+    },
+    "emptyHistoryLoadFail": {
+        "message": "Failed to load history"
+    },
+    "emptyBookmarks": {
+        "message": "No bookmarks found"
+    },
+    "emptyBookmarkLoadFail": {
+        "message": "Failed to load bookmarks"
+    },
+    "timeJustNow": {
+        "message": "Just now"
+    },
+    "timeMinsAgo": {
+        "message": "$1 mins ago",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "timeHoursAgo": {
+        "message": "$1 hours ago",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "timeDaysAgo": {
+        "message": "$1 days ago",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "timeToday": {
+        "message": "Today"
+    },
+    "timeYesterday": {
+        "message": "Yesterday"
+    },
+    "defaultTitle": {
+        "message": "(No Title)"
+    },
+    "defaultFolder": {
+        "message": "Folder"
+    },
+    "settingsNotHideable": {
+        "message": "Settings tab cannot be hidden"
+    },
+    "settingsToggle": {
+        "message": "Show/Hide"
+    },
+    "sessionDefaultName": {
+        "message": "Session $1",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "settingsOtherTitle": {
+        "message": "Other Settings"
+    },
+    "settingsTabDisplayMode": {
+        "message": "Tab Display Mode"
+    },
+    "settingsHistoryRecentlyClosed": {
+        "message": "History: Show recently closed tabs"
+    },
+    "settingsBookmarkVisitCount": {
+        "message": "Bookmarks: Show visit count in Most Visited"
+    },
+    "modeFull": {
+        "message": "Full"
+    },
+    "modeCompact": {
+        "message": "Compact"
+    },
+    "modeMini": {
+        "message": "Mini"
+    },
+    "displayMode": {
+        "message": "Switch Display Mode"
+    },
+    "recentlyClosedHeader": {
+        "message": "Recently Closed Tabs"
+    },
+    "historyListHeader": {
+        "message": "All History"
+    }
+}

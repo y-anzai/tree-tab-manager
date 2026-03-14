@@ -34,16 +34,22 @@ const state = {
   customTabNames: {},    // tabId -> customName
   tabCustomNamesByUrl: {}, // url -> customName（再訪時のため）
 
+  // ユーザー設定
+  userSettings: {
+    historyRecentlyClosed: false,
+    bookmarkVisitCount: false
+  },
+
   // タブ管理・設定
   tabConfig: []
 };
 
 // デフォルトのタブ設定
 const DEFAULT_TAB_CONFIG = [
-  { id: 'tabs', label: 'タブ', visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/></svg>' },
-  { id: 'history', label: '履歴', visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>' },
-  { id: 'bookmarks', label: 'お気に入り', visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>' },
-  { id: 'settings', label: '設定', visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>' }
+  { id: 'tabs', label: chrome.i18n.getMessage('navTabs'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/></svg>' },
+  { id: 'history', label: chrome.i18n.getMessage('navHistory'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>' },
+  { id: 'bookmarks', label: chrome.i18n.getMessage('navBookmarks'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>' },
+  { id: 'settings', label: chrome.i18n.getMessage('navSettings'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>' }
 ];
 
 // ===== 表示モード管理 =====
@@ -102,6 +108,10 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
   const idx = DISPLAY_MODES.indexOf(state.displayMode);
   const next = DISPLAY_MODES[(idx + 1) % DISPLAY_MODES.length];
   applyDisplayMode(next);
+
+  // Update select input in settings if exists
+  const sel = document.getElementById('setting-display-mode');
+  if (sel) sel.value = next;
 });
 
 // ===== タブ並び順モード管理 =====
@@ -159,7 +169,7 @@ function formatTime(timestamp) {
   const diffMs = now - d;
   const diffMin = Math.floor(diffMs / 60000);
   const diffHour = Math.floor(diffMs / 3600000);
-  if (diffMin < 1) return 'たった今';
+  if (diffMin < 1) return chrome.i18n.getMessage('timeJustNow');
   if (diffMin < 60) return `${diffMin}分前`;
   if (diffHour < 24) return `${diffHour}時間前`;
   const diffDay = Math.floor(diffMs / 86400000);
@@ -200,6 +210,22 @@ function getDefaultFavicon() {
       <path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/>
     </svg>
   </span>`;
+}
+
+// ===== ユーザー設定管理 =====
+function loadUserSettings() {
+  try {
+    const saved = localStorage.getItem('ttm-user-settings');
+    if (saved) {
+      state.userSettings = { ...state.userSettings, ...JSON.parse(saved) };
+    }
+  } catch (e) { }
+}
+
+function saveUserSettings() {
+  try {
+    localStorage.setItem('ttm-user-settings', JSON.stringify(state.userSettings));
+  } catch (e) { }
 }
 
 // ===== タブナビゲーション設定管理 =====
@@ -289,7 +315,7 @@ function renderSettingsPanel() {
       <div class="settings-item-label">
         ${tab.icon} ${escapeHtml(tab.label)}
       </div>
-      <input type="checkbox" class="settings-checkbox" ${checkedHtml} ${checkboxDisabled} title="${isSettings ? '設定タブは非表示にできません' : '表示/非表示'}">
+      <input type="checkbox" class="settings-checkbox" ${checkedHtml} ${checkboxDisabled} title="${isSettings ? chrome.i18n.getMessage('settingsNotHideable') : chrome.i18n.getMessage('settingsToggle')}">
     `;
 
     // チェックボックス切り替え
@@ -359,6 +385,35 @@ function renderSettingsPanel() {
 
     list.appendChild(item);
   });
+
+  // その他の設定
+  const cbHistory = document.getElementById('setting-history-recent');
+  if (cbHistory) {
+    cbHistory.checked = state.userSettings.historyRecentlyClosed;
+    cbHistory.onchange = (e) => {
+      state.userSettings.historyRecentlyClosed = e.target.checked;
+      saveUserSettings();
+      if (document.getElementById('panel-history').classList.contains('active')) loadHistory();
+    };
+  }
+
+  const cbBookmark = document.getElementById('setting-bookmark-visit');
+  if (cbBookmark) {
+    cbBookmark.checked = state.userSettings.bookmarkVisitCount;
+    cbBookmark.onchange = (e) => {
+      state.userSettings.bookmarkVisitCount = e.target.checked;
+      saveUserSettings();
+      if (document.getElementById('panel-bookmarks').classList.contains('active')) renderBookmarks();
+    };
+  }
+
+  const selDisplayMode = document.getElementById('setting-display-mode');
+  if (selDisplayMode) {
+    selDisplayMode.value = state.displayMode;
+    selDisplayMode.onchange = (e) => {
+      applyDisplayMode(e.target.value);
+    };
+  }
 }
 
 // ===== モーダル管理 =====
@@ -498,15 +553,15 @@ function buildTabTree(tabs, parents) {
 
 // Chrome タブグループの利用可能カラー
 const GROUP_COLORS = [
-  { name: 'grey', label: 'グレー' },
-  { name: 'blue', label: 'ブルー' },
-  { name: 'red', label: 'レッド' },
-  { name: 'yellow', label: 'イエロー' },
-  { name: 'green', label: 'グリーン' },
-  { name: 'pink', label: 'ピンク' },
-  { name: 'purple', label: 'パープル' },
-  { name: 'cyan', label: 'シアン' },
-  { name: 'orange', label: 'オレンジ' },
+  { name: 'grey', label: chrome.i18n.getMessage('colorGrey') },
+  { name: 'blue', label: chrome.i18n.getMessage('colorBlue') },
+  { name: 'red', label: chrome.i18n.getMessage('colorRed') },
+  { name: 'yellow', label: chrome.i18n.getMessage('colorYellow') },
+  { name: 'green', label: chrome.i18n.getMessage('colorGreen') },
+  { name: 'pink', label: chrome.i18n.getMessage('colorPink') },
+  { name: 'purple', label: chrome.i18n.getMessage('colorPurple') },
+  { name: 'cyan', label: chrome.i18n.getMessage('colorCyan') },
+  { name: 'orange', label: chrome.i18n.getMessage('colorOrange') },
 ];
 
 // 任意のタブサブセットからサブツリーを構築（グループ内・未グループの両方で使用）
@@ -639,7 +694,7 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
     },
     { separator: true },
     {
-      label: 'グループ名を変更',
+      label: chrome.i18n.getMessage('ctxEditGroupName'),
       icon: pencilIcon,
       action: async () => {
         const newTitle = prompt('グループ名:', groupInfo?.title || '');
@@ -654,7 +709,7 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
     },
     { separator: true },
     {
-      label: 'グループを解除',
+      label: chrome.i18n.getMessage('ctxUngroup'),
       danger: true,
       icon: xIcon,
       action: async () => {
@@ -933,7 +988,7 @@ function showTabContextMenu(x, y, tab) {
   const menuItems = [
     // ─── 基本操作（全モード共通）───
     {
-      label: tab.pinned ? '固定を解除' : 'タブを固定',
+      label: tab.pinned ? chrome.i18n.getMessage('ctxUnpinTab') : chrome.i18n.getMessage('ctxPinTab'),
       icon: ICON.pin,
       action: () => toggleTabPin(tab.id, !tab.pinned)
     },
@@ -953,7 +1008,7 @@ function showTabContextMenu(x, y, tab) {
     if (tabGroupId !== undefined) {
       // グループ内のタブ → 除外のみ
       menuItems.push({
-        label: 'グループから除外',
+        label: chrome.i18n.getMessage('ctxRemoveFromGroup'),
         icon: ICON.ungroup,
         action: async () => {
           try {
@@ -1024,7 +1079,7 @@ function showTabContextMenu(x, y, tab) {
       menuItems.push(
         { separator: true },
         {
-          label: '子ツリーを1つ上に移動',
+          label: chrome.i18n.getMessage('ctxMoveTreeUp'),
           icon: ICON.lift,
           action: () => moveChildrenToParentLevel(tab.id)
         },
@@ -1064,7 +1119,7 @@ function showTabContextMenu(x, y, tab) {
     if (parentTabId && state.tabs.find(t => t.id === parentTabId)) {
       const grandParentId = state.tabParents[parentTabId] || null;
       menuItems.push({
-        label: '1つ上のツリーの子にする',
+        label: chrome.i18n.getMessage('ctxMoveToGrandparent'),
         icon: ICON.up,
         action: () => moveToGrandParentLevel(tab.id, grandParentId)
       });
@@ -1075,20 +1130,20 @@ function showTabContextMenu(x, y, tab) {
   menuItems.push(
     { separator: true },
     {
-      label: '名前を編集',
+      label: chrome.i18n.getMessage('ctxEditName'),
       icon: ICON.pencil,
       action: () => editTabName(tab)
     },
     {
-      label: 'URLをコピー',
+      label: chrome.i18n.getMessage('ctxCopyUrl'),
       icon: ICON.copy,
       action: () => {
-        navigator.clipboard.writeText(tab.url).then(() => showToast('URLをコピーしました', 'success'));
+        navigator.clipboard.writeText(tab.url).then(() => showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success'));
       }
     },
     { separator: true },
     {
-      label: hasChildren && !isRecentMode ? 'このタブを閉じる' : 'タブを閉じる',
+      label: hasChildren && !isRecentMode ? 'このタブを閉じる' : chrome.i18n.getMessage('ctxCloseTab'),
       danger: true,
       icon: ICON.close,
       action: () => closeTab(tab.id)
@@ -1196,7 +1251,7 @@ async function aggregateSameDomain(parentTabId, sameDomainTabs) {
 async function moveToGrandParentLevel(tabId, grandParentId) {
   try {
     await sendMessage('SET_TAB_PARENT', { tabId, parentId: grandParentId });
-    showToast('タブを1つ上のレベルに移動しました', 'success');
+    showToast(chrome.i18n.getMessage('toastTabLevelUp'), 'success');
     await refreshTabTree();
   } catch (err) {
     console.error('Failed to move tab:', err);
@@ -1221,7 +1276,7 @@ async function editTabName(tab) {
       localStorage.removeItem(`ttm-custom-name-${tab.id}`);
       localStorage.removeItem(`ttm-custom-name-url-${tab.url}`);
     } catch { }
-    showToast('タブ名をリセットしました', 'success');
+    showToast(chrome.i18n.getMessage('toastTabNameReset'), 'success');
   } else {
     // 新しい名前を設定
     state.customTabNames[tab.id] = newName.trim();
@@ -1230,7 +1285,7 @@ async function editTabName(tab) {
       localStorage.setItem(`ttm-custom-name-${tab.id}`, newName.trim());
       localStorage.setItem(`ttm-custom-name-url-${tab.url}`, newName.trim());
     } catch { }
-    showToast('タブ名を更新しました', 'success');
+    showToast(chrome.i18n.getMessage('toastTabNameUpdated'), 'success');
   }
 
   renderTabTree();
@@ -1247,7 +1302,7 @@ function getTabDisplayName(tab) {
     return state.tabCustomNamesByUrl[tab.url];
   }
   // 3. デフォルトタイトル
-  return tab.title || '(タイトルなし)';
+  return tab.title || '(No Title)';
 }
 
 // タブ操作
@@ -1274,7 +1329,7 @@ async function closeTab(tabId) {
 async function toggleTabPin(tabId, pinned) {
   try {
     await sendMessage('PIN_TAB', { tabId, pinned });
-    showToast(pinned ? 'タブを固定しました' : '固定を解除しました', 'success');
+    showToast(pinned ? chrome.i18n.getMessage('toastPinned') : chrome.i18n.getMessage('toastUnpinned'), 'success');
     await refreshTabTree();
   } catch (e) {
     console.error('Failed to pin tab:', e);
@@ -1539,9 +1594,9 @@ document.getElementById('btn-confirm-save').addEventListener('click', async () =
   try {
     await sendMessage('SAVE_SESSION', { name: name || undefined });
     closeModal('modal-save-session');
-    showToast('セッションを保存しました', 'success');
+    showToast(chrome.i18n.getMessage('toastSessionSaved'), 'success');
   } catch (e) {
-    showToast('保存に失敗しました', 'error');
+    showToast(chrome.i18n.getMessage('toastSessionSaveFailed'), 'error');
   }
 });
 
@@ -1588,9 +1643,9 @@ async function loadSessionList() {
         try {
           await sendMessage('RESTORE_SESSION', { sessionId: session.id });
           closeModal('modal-load-session');
-          showToast('セッションを復元しました', 'success');
+          showToast(chrome.i18n.getMessage('toastSessionRestored'), 'success');
         } catch {
-          showToast('復元に失敗しました', 'error');
+          showToast(chrome.i18n.getMessage('toastSessionRestoreFailed'), 'error');
         }
       });
 
@@ -1598,7 +1653,7 @@ async function loadSessionList() {
         e.stopPropagation();
         await sendMessage('DELETE_SESSION', { sessionId: session.id });
         await loadSessionList();
-        showToast('セッションを削除しました');
+        showToast(chrome.i18n.getMessage('toastSessionDeleted'));
       });
 
       list.appendChild(item);
@@ -1613,9 +1668,16 @@ let historySearchTimeout = null;
 
 async function loadHistory(query = '') {
   const container = document.getElementById('history-list');
-  container.innerHTML = '<div class="loading">読み込み中...</div>';
+  container.innerHTML = '<div class="loading" data-i18n="msgLoading">読み込み中...</div>';
 
   try {
+    let recentSessions = [];
+    if (state.userSettings.historyRecentlyClosed && !query) {
+      recentSessions = await new Promise((resolve) => {
+        chrome.sessions.getRecentlyClosed({ maxResults: 10 }, (sessions) => resolve(sessions || []));
+      });
+    }
+
     const resp = await sendMessage('GET_HISTORY', {
       query,
       maxResults: 200,
@@ -1624,13 +1686,13 @@ async function loadHistory(query = '') {
 
     const items = resp?.history || [];
     state.historyItems = items;
-    renderHistory(items, query);
+    renderHistory(items, query, recentSessions);
   } catch (e) {
-    container.innerHTML = '<div class="empty-state"><p>履歴の読み込みに失敗しました</p></div>';
+    container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyHistoryLoadFail')}</p></div>`;
   }
 }
 
-function renderHistory(items, query = '') {
+function renderHistory(items, query = '', recentSessions = []) {
   const container = document.getElementById('history-list');
 
   if (items.length === 0) {
@@ -1650,6 +1712,70 @@ function renderHistory(items, query = '') {
   });
 
   container.innerHTML = '';
+
+  // 最近閉じたタブを描画
+  if (recentSessions.length > 0) {
+    const recentGroupEl = document.createElement('div');
+    recentGroupEl.className = 'history-group';
+
+    const recentDateEl = document.createElement('div');
+    recentDateEl.className = 'history-date';
+    recentDateEl.textContent = chrome.i18n.getMessage('recentlyClosedHeader');
+    recentGroupEl.appendChild(recentDateEl);
+
+    recentSessions.forEach(session => {
+      let extItem = null;
+      let isWindow = false;
+      if (session.tab) extItem = session.tab;
+      else if (session.window) {
+        extItem = { title: `${session.window.tabs.length} tabs`, url: '', lastModified: session.lastModified };
+        isWindow = true; // For now simplify representation of window
+      }
+      if (!extItem) return;
+
+      const el = document.createElement('div');
+      el.className = 'history-item';
+
+      const faviconUrl = isWindow ? '' : getFaviconUrl(extItem.url);
+      const title = extItem.title || extItem.url;
+      const url = extItem.url || '';
+
+      el.innerHTML = `
+        ${isWindow
+          ? `<svg class="history-favicon" viewBox="0 0 20 20" fill="currentColor" style="color:var(--text-muted)"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>`
+          : (faviconUrl ? `<img class="history-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">` : `<svg class="history-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`)
+        }
+        <div class="history-info">
+          <div class="history-title">${escapeHtml(title)}</div>
+          <div class="history-url">${escapeHtml(url)}</div>
+        </div>
+        <div class="history-time">${formatTime(session.lastModified * 1000)}</div>
+        <button class="history-remove" title="Restore">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+        </button>
+      `;
+
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.history-remove')) {
+          chrome.sessions.restore(session.sessionId);
+          el.remove();
+        } else {
+          if (!isWindow) chrome.tabs.create({ url: extItem.url });
+        }
+      });
+      recentGroupEl.appendChild(el);
+    });
+    container.appendChild(recentGroupEl);
+
+    // Add separator if there are standard history items
+    if (Object.keys(groups).length > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'history-date';
+      sep.style.marginTop = '16px';
+      sep.textContent = chrome.i18n.getMessage('historyListHeader');
+      container.appendChild(sep);
+    }
+  }
   Object.entries(groups).forEach(([date, dateItems]) => {
     const groupEl = document.createElement('div');
     groupEl.className = 'history-group';
@@ -1692,7 +1818,7 @@ function renderHistory(items, query = '') {
         e.stopPropagation();
         await chrome.history.deleteUrl({ url: item.url });
         el.remove();
-        showToast('履歴から削除しました');
+        showToast(chrome.i18n.getMessage('toastHistoryDeleted'));
       });
 
       groupEl.appendChild(el);
@@ -1832,8 +1958,12 @@ function createBookmarkItem(item, query = '') {
   const title = highlightText(item.title || item.url, query);
   let dateStr = '';
   if (state.bookmarkSortMode === 'most-visited') {
-    const count = state.visitCountMap[item.url] || 0;
-    dateStr = count > 0 ? `${count.toLocaleString()}回` : '';
+    if (state.userSettings.bookmarkVisitCount) {
+      const count = state.visitCountMap[item.url] || 0;
+      dateStr = count > 0 ? `${count.toLocaleString()}回` : '';
+    } else {
+      dateStr = '';
+    }
   } else {
     const usedTime = state.recentlyUsedBookmarks[item.url];
     dateStr = usedTime ? formatTime(usedTime) : (item.dateAdded ? formatTime(item.dateAdded) : '');
@@ -1866,20 +1996,20 @@ function createBookmarkItem(item, query = '') {
     e.preventDefault();
     showContextMenu(e.clientX, e.clientY, [
       {
-        label: '新しいタブで開く',
+        label: chrome.i18n.getMessage('ctxOpenNewTab'),
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/></svg>`,
         action: () => chrome.tabs.create({ url: item.url })
       },
       {
-        label: 'URLをコピー',
+        label: chrome.i18n.getMessage('ctxCopyUrl'),
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/></svg>`,
         action: () => {
-          navigator.clipboard.writeText(item.url).then(() => showToast('URLをコピーしました', 'success'));
+          navigator.clipboard.writeText(item.url).then(() => showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success'));
         }
       },
       { separator: true },
       {
-        label: '編集',
+        label: chrome.i18n.getMessage('ctxEdit'),
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
         action: async () => {
           const newTitle = prompt('新しいタイトルを入力してください:', item.title);
@@ -1889,29 +2019,29 @@ function createBookmarkItem(item, query = '') {
 
           try {
             await chrome.bookmarks.update(item.id, { title: newTitle, url: newUrl });
-            showToast('ブックマークを更新しました', 'success');
+            showToast(chrome.i18n.getMessage('toastBookmarkUpdated'), 'success');
             state.bookmarkTree = null;
             loadBookmarks();
           } catch (err) {
             console.error('Failed to update bookmark', err);
-            showToast('更新に失敗しました', 'error');
+            showToast(chrome.i18n.getMessage('toastBookmarkUpdateFailed'), 'error');
           }
         }
       },
       {
-        label: '削除',
+        label: chrome.i18n.getMessage('ctxDelete'),
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
         danger: true,
         action: async () => {
           if (confirm(`「${item.title || item.url}」を削除しますか？`)) {
             try {
               await chrome.bookmarks.remove(item.id);
-              showToast('ブックマークを削除しました', 'success');
+              showToast(chrome.i18n.getMessage('toastBookmarkDeleted'), 'success');
               state.bookmarkTree = null;
               loadBookmarks();
             } catch (err) {
               console.error('Failed to remove bookmark', err);
-              showToast('削除に失敗しました', 'error');
+              showToast(chrome.i18n.getMessage('toastBookmarkDeleteFailed'), 'error');
             }
           }
         }
@@ -1947,7 +2077,7 @@ function renderBookmarkTree(container, nodes) {
           <svg class="bookmark-folder-icon" viewBox="0 0 20 20" fill="currentColor">
             <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
           </svg>
-          <span class="bookmark-folder-name">${escapeHtml(node.title || 'フォルダ')}</span>
+          <span class="bookmark-folder-name">${escapeHtml(node.title || chrome.i18n.getMessage('defaultFolder'))}</span>
           <span class="bookmark-folder-count">${countBookmarks(node.children)}</span>
         `;
         header.addEventListener('click', () => {
@@ -2025,6 +2155,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // ===== 初期化 =====
 async function init() {
+  loadUserSettings();
   loadTabConfig();
   renderNavTabs();
   renderSettingsPanel();
@@ -2032,3 +2163,18 @@ async function init() {
 }
 
 init().catch(console.error);
+
+
+// ===== i18n Localization =====
+function localizeHtmlPage() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.innerHTML = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
+  });
+}
+document.addEventListener('DOMContentLoaded', localizeHtmlPage);
