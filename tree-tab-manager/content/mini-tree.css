@@ -1,0 +1,8 @@
+/* Tree Tab Manager - Mini Tree Content CSS */
+/* このファイルはコンテンツスクリプトとして読み込まれるが、
+   UIはすべて Shadow DOM 内に構築するため、ここには最小限のみ */
+
+/* ホスト要素自体はpage layoutに影響を与えない */
+#ttm-mini-tree-host {
+    /* Shadow DOM のコンテナ。Fixed配置はJS側で設定 */
+}

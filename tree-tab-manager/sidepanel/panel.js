@@ -33,7 +33,60 @@ const state = {
   // タブ名カスタマイズ
   customTabNames: {},    // tabId -> customName
   tabCustomNamesByUrl: {}, // url -> customName（再訪時のため）
+
+  // ユーザー設定
+  userSettings: {
+    historyRecentlyClosed: false,
+    bookmarkVisitCount: false,
+    themeColor: 'blue',
+    colorScheme: 'auto',
+    sidePanelSide: 'right',
+    miniTreeWidth: 90,
+    shortcuts: {
+      'new-tab': 'Alt+N',
+      'toggle-pinned': 'Alt+P',
+      'display-mode': 'Alt+D',
+      'sort-mode': 'Alt+S',
+      'collapse-all': 'Alt+Up',
+      'expand-all': 'Alt+Down',
+      'focus-search': '/',
+      'switch-tabs': 'Alt+1',
+      'switch-history': 'Alt+2',
+      'switch-bookmarks': 'Alt+3',
+      'switch-settings': 'Alt+4',
+      'toggle-mini-tree': 'Cmd+Shift+X'
+    }
+  },
+  isRecordingShortcut: false,
+
+  // タブ管理・設定
+  tabConfig: []
 };
+
+// ショートカット定義
+const SHORTCUT_ACTIONS = [
+  { id: 'switch-tabs', label: chrome.i18n.getMessage('actionSwitchTabs') },
+  { id: 'switch-history', label: chrome.i18n.getMessage('actionSwitchHistory') },
+  { id: 'switch-bookmarks', label: chrome.i18n.getMessage('actionSwitchBookmarks') },
+  { id: 'switch-settings', label: chrome.i18n.getMessage('actionSwitchSettings') },
+  { id: 'new-tab', label: chrome.i18n.getMessage('actionNewTab') },
+  { id: 'focus-search', label: chrome.i18n.getMessage('actionFocusSearch') },
+  { id: 'toggle-pinned', label: chrome.i18n.getMessage('actionTogglePinned') },
+  { id: 'display-mode', label: chrome.i18n.getMessage('actionDisplayMode') },
+  { id: 'sort-mode', label: chrome.i18n.getMessage('actionSortMode') },
+  { id: 'collapse-all', label: chrome.i18n.getMessage('actionCollapseAll') },
+  { id: 'expand-all', label: chrome.i18n.getMessage('actionExpandAll') },
+  { id: 'toggle-mini-tree', label: chrome.i18n.getMessage('actionToggleMiniTree') }
+];
+
+// デフォルトのタブ設定
+const DEFAULT_TAB_CONFIG = [
+  { id: 'tabs', label: chrome.i18n.getMessage('navTabs'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/></svg>' },
+  { id: 'history', label: chrome.i18n.getMessage('navHistory'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>' },
+  { id: 'bookmarks', label: chrome.i18n.getMessage('navBookmarks'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>' },
+  { id: 'readingList', label: chrome.i18n.getMessage('navReadingList'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>' },
+  { id: 'settings', label: chrome.i18n.getMessage('navSettings'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>' }
+];
 
 // ===== 表示モード管理 =====
 const DISPLAY_MODES = ['full', 'compact', 'mini'];
@@ -56,21 +109,117 @@ function applyDisplayMode(mode) {
   DISPLAY_MODES.forEach(m => document.body.classList.remove(`mode-${m}`));
   document.body.classList.add(`mode-${mode}`);
   state.displayMode = mode;
-  try { localStorage.setItem('ttm-displayMode', mode); } catch {}
+  try { localStorage.setItem('ttm-displayMode', mode); } catch { }
 
   const btn = document.getElementById('btn-display-mode');
   if (!btn) return;
   btn.innerHTML = MODE_ICONS[mode];
-  btn.title = `表示モード: ${MODE_LABELS[mode]}（クリックで切替）`;
+
+  let titleStr = '';
+  if (mode === 'full') titleStr = chrome.i18n.getMessage('modeTitleFull');
+  else if (mode === 'compact') titleStr = chrome.i18n.getMessage('modeTitleCompact');
+  else if (mode === 'mini') titleStr = chrome.i18n.getMessage('modeTitleMini');
+
+  btn.title = titleStr;
   btn.classList.toggle('mode-active-compact', mode === 'compact');
-  btn.classList.toggle('mode-active-mini',    mode === 'mini');
+  btn.classList.toggle('mode-active-mini', mode === 'mini');
+}
+
+// Preset palette: [accent-hex-dark, accent-hex-light, bg-primary-dark, bg-primary-light]
+const THEME_PRESETS = {
+  blue: { dark: '#89b4fa', light: '#0071e3', bgDark: '#1e1e2e', bgLight: '#f5f5f7' },
+  green: { dark: '#a6e3a1', light: '#34c759', bgDark: '#1e2e1e', bgLight: '#f0fff4' },
+  yellow: { dark: '#f9e2af', light: '#bb8000', bgDark: '#2e2a18', bgLight: '#fffbee' },
+  red: { dark: '#f38ba8', light: '#cc2222', bgDark: '#2e1e20', bgLight: '#fff0f1' },
+  purple: { dark: '#cba6f7', light: '#a855f7', bgDark: '#221e2e', bgLight: '#f8f0ff' },
+  pink: { dark: '#f5c2e7', light: '#ff2d55', bgDark: '#2e1e28', bgLight: '#fff0f8' },
+};
+
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1, 3), 16) / 255;
+  let g = parseInt(hex.slice(3, 5), 16) / 255;
+  let b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+}
+
+function applyThemeColor(colorOrHex) {
+  state.userSettings.themeColor = colorOrHex;
+  const isDark = document.body.getAttribute('data-color-scheme') !== 'light';
+
+  let accentHex;
+  if (THEME_PRESETS[colorOrHex]) {
+    const p = THEME_PRESETS[colorOrHex];
+    accentHex = isDark ? p.dark : p.light;
+  } else {
+    accentHex = colorOrHex;
+  }
+
+  const [h, s] = hexToHsl(accentHex);
+
+  // Derive bg tones from theme hue
+  // Light mode: Lower luminosity slightly and keep some saturation to make tint visible
+  const bg = isDark ? [
+    hslToHex(h, Math.min(s, 35), 14),
+    hslToHex(h, Math.min(s, 30), 18),
+    hslToHex(h, Math.min(s, 28), 22),
+    hslToHex(h, Math.min(s, 25), 27),
+    hslToHex(h, Math.min(s, 22), 33),
+  ] : [
+    hslToHex(h, Math.min(s, 25), 97), // primary (very light tint)
+    hslToHex(h, Math.min(s, 22), 93), // secondary
+    hslToHex(h, Math.min(s, 20), 88), // tertiary
+    hslToHex(h, Math.min(s, 18), 82), // hover
+    hslToHex(h, Math.min(s, 16), 75), // active
+  ];
+
+  // Apply to both html and body to ensure specificity over CSS [data-color-scheme="light"]
+  [document.documentElement, document.body].forEach(el => {
+    el.style.setProperty('--theme-color', accentHex);
+    el.style.setProperty('--bg-primary', bg[0]);
+    el.style.setProperty('--bg-secondary', bg[1]);
+    el.style.setProperty('--bg-tertiary', bg[2]);
+    el.style.setProperty('--bg-hover', bg[3]);
+    el.style.setProperty('--bg-active', bg[4]);
+  });
 }
 
 // ===== 外観モード（ダーク/ライト）自動切り替え =====
 function applyColorScheme() {
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const mode = state.userSettings.colorScheme || 'auto';
+  let isDark;
+
+  if (mode === 'auto') {
+    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } else {
+    isDark = (mode === 'dark');
+  }
+
   document.documentElement.setAttribute('data-color-scheme', isDark ? 'dark' : 'light');
   document.body.setAttribute('data-color-scheme', isDark ? 'dark' : 'light');
+
+  if (state.userSettings.themeColor) {
+    applyThemeColor(state.userSettings.themeColor);
+  }
 }
 
 // 初期化時に外観モードを適用
@@ -88,9 +237,20 @@ state.displayMode = (() => {
 applyDisplayMode(state.displayMode);
 
 document.getElementById('btn-display-mode').addEventListener('click', () => {
-  const idx  = DISPLAY_MODES.indexOf(state.displayMode);
+  const idx = DISPLAY_MODES.indexOf(state.displayMode);
   const next = DISPLAY_MODES[(idx + 1) % DISPLAY_MODES.length];
   applyDisplayMode(next);
+
+  // Update select input in settings if exists
+  const sel = document.getElementById('setting-display-mode');
+  if (sel) sel.value = next;
+});
+
+document.getElementById('btn-toggle-mini-tree').addEventListener('click', () => {
+  chrome.storage.local.get('ttm-mini-tree-visible', (res) => {
+    const next = !res['ttm-mini-tree-visible'];
+    chrome.storage.local.set({ 'ttm-mini-tree-visible': next });
+  });
 });
 
 // ===== タブ並び順モード管理 =====
@@ -98,13 +258,15 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
 
 function applySortMode(mode) {
   state.tabSortMode = mode;
-  try { localStorage.setItem('ttm-tabSortMode', mode); } catch {}
+  try { localStorage.setItem('ttm-tabSortMode', mode); } catch { }
   const btn = document.getElementById('btn-sort-mode');
   if (!btn) return;
   btn.classList.toggle('sort-mode-active', mode === 'recent');
   btn.title = mode === 'recent'
-    ? '並び順: 最近開いた順（クリックでツリー順に戻す）'
-    : '並び順: ツリー（クリックで最近開いた順に）';
+    ? chrome.i18n.getMessage('sortRecentTooltip')
+    : chrome.i18n.getMessage('sortTreeTooltip');
+  // background.jsが読み込めるように同期
+  chrome.storage.local.set({ 'ttm-tab-sort-mode': mode });
 }
 
 // 保存された並び順を復元（なければ 'tree'）
@@ -112,12 +274,90 @@ state.tabSortMode = (() => {
   try { return localStorage.getItem('ttm-tabSortMode') || 'tree'; } catch { return 'tree'; }
 })();
 applySortMode(state.tabSortMode);
+chrome.storage.local.set({ 'ttm-tab-sort-mode': state.tabSortMode });
 
 document.getElementById('btn-sort-mode').addEventListener('click', () => {
   const next = state.tabSortMode === 'tree' ? 'recent' : 'tree';
   applySortMode(next);
   renderTabTree();
 });
+
+// ===== ショートカット管理 =====
+function getShortcutString(e) {
+  const parts = [];
+  if (e.ctrlKey) parts.push('Ctrl');
+  if (e.shiftKey) parts.push('Shift');
+  if (e.altKey) parts.push('Alt');
+  if (e.metaKey) parts.push('Cmd');
+
+  // メインキー（修飾キー単体の場合は含めない）
+  if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+    let key = e.key;
+    if (key === ' ') key = 'Space';
+    if (key === 'ArrowUp') key = 'Up';
+    if (key === 'ArrowDown') key = 'Down';
+    if (key === 'ArrowLeft') key = 'Left';
+    if (key === 'ArrowRight') key = 'Right';
+
+    // 1文字の場合は大文字、それ以外はそのまま
+    parts.push(key.length === 1 ? key.toUpperCase() : key);
+  } else if (parts.length === 0) {
+    // 修飾キーのみの場合は無効な文字列を返す（録画中は別）
+    return '';
+  }
+
+  return parts.join('+');
+}
+
+function handleShortcutAction(actionId) {
+  switch (actionId) {
+    case 'switch-tabs':
+      document.querySelector('[data-panel="tabs"]')?.click();
+      break;
+    case 'switch-history':
+      document.querySelector('[data-panel="history"]')?.click();
+      break;
+    case 'switch-bookmarks':
+      document.querySelector('[data-panel="bookmarks"]')?.click();
+      break;
+    case 'switch-settings':
+      document.querySelector('[data-panel="settings"]')?.click();
+      break;
+    case 'new-tab':
+      document.getElementById('btn-new-tab')?.click();
+      break;
+    case 'focus-search':
+      const activePanel = document.querySelector('.panel.active');
+      const searchInput = activePanel?.querySelector('input[type="text"]');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+      break;
+    case 'toggle-pinned':
+      document.getElementById('btn-toggle-pinned')?.click();
+      break;
+    case 'display-mode':
+      document.getElementById('btn-display-mode')?.click();
+      break;
+    case 'sort-mode':
+      document.getElementById('btn-sort-mode')?.click();
+      break;
+    case 'collapse-all':
+      document.getElementById('btn-collapse-all')?.click();
+      break;
+    case 'expand-all':
+      document.getElementById('btn-expand-all')?.click();
+      break;
+    case 'toggle-mini-tree':
+      // アクティブタブのcontent scriptへトグルを送信
+      chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+        if (!tab || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) return;
+        chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
+      });
+      break;
+  }
+}
 
 // ===== ユーティリティ =====
 function sendMessage(type, data = {}) {
@@ -148,7 +388,7 @@ function formatTime(timestamp) {
   const diffMs = now - d;
   const diffMin = Math.floor(diffMs / 60000);
   const diffHour = Math.floor(diffMs / 3600000);
-  if (diffMin < 1) return 'たった今';
+  if (diffMin < 1) return chrome.i18n.getMessage('timeJustNow');
   if (diffMin < 60) return `${diffMin}分前`;
   if (diffHour < 24) return `${diffHour}時間前`;
   const diffDay = Math.floor(diffMs / 86400000);
@@ -171,12 +411,11 @@ function formatDate(timestamp) {
 }
 
 function getFaviconUrl(url) {
-  try {
-    const u = new URL(url);
-    return `https://www.google.com/s2/favicons?sz=16&domain=${u.hostname}`;
-  } catch {
-    return null;
-  }
+  if (!url) return null;
+  // 全てのURL（通常のWebサイトも含む）でChrome純正のfaviconサービスを強制的に使用する。
+  // これにより、claude.aiのような厳格なセキュリティ設定を持つサイトのアイコンも
+  // ブラウザの内部キャッシュ経由で安全に表示できる。
+  return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(url)}&size=32`;
 }
 
 function escapeHtml(str) {
@@ -191,19 +430,416 @@ function getDefaultFavicon() {
   </span>`;
 }
 
-// ===== タブナビゲーション =====
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const panelId = btn.dataset.panel;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(`panel-${panelId}`).classList.add('active');
+// ===== ユーザー設定管理 =====
 
-    if (panelId === 'history') loadHistory();
-    if (panelId === 'bookmarks') loadBookmarks();
+
+function loadUserSettings() {
+  try {
+    const saved = localStorage.getItem('ttm-user-settings');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      state.userSettings = {
+        ...state.userSettings,
+        ...parsed,
+        shortcuts: { ...state.userSettings.shortcuts, ...(parsed.shortcuts || {}) }
+      };
+    }
+  } catch (e) { }
+  applyColorScheme();
+  // 起動時にショートカットと位置設定、幅をcontent scriptが読めるようにsync
+  chrome.storage.local.set({
+    'ttm-shortcuts': state.userSettings.shortcuts || {},
+    'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
+    'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
   });
-});
+}
+
+let saveTimeout = null;
+function saveUserSettingsDebounced() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveUserSettings();
+  }, 500);
+}
+
+function saveUserSettings() {
+  try {
+    localStorage.setItem('ttm-user-settings', JSON.stringify(state.userSettings));
+    // content scriptが読めるようにchrome.storage.localにも同期
+    chrome.storage.local.set({
+      'ttm-shortcuts': state.userSettings.shortcuts || {},
+      'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
+      'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
+    });
+  } catch (e) { }
+}
+
+// ===== タブナビゲーション設定管理 =====
+function loadTabConfig() {
+  try {
+    const saved = localStorage.getItem('ttm-tab-config');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Ensure all defaults exist in parsed (in case of updates)
+      const merged = parsed.filter(p => DEFAULT_TAB_CONFIG.some(d => d.id === p.id));
+      DEFAULT_TAB_CONFIG.forEach(d => {
+        if (!merged.some(m => m.id === d.id)) merged.push(d);
+      });
+      // Override label and icon with the current localized version
+      merged.forEach(m => {
+        const defaultDef = DEFAULT_TAB_CONFIG.find(d => d.id === m.id);
+        if (defaultDef) {
+          m.label = defaultDef.label;
+          m.icon = defaultDef.icon;
+        }
+      });
+      state.tabConfig = merged;
+    } else {
+      state.tabConfig = [...DEFAULT_TAB_CONFIG];
+    }
+  } catch (e) {
+    state.tabConfig = [...DEFAULT_TAB_CONFIG];
+  }
+}
+
+function saveTabConfig() {
+  try {
+    localStorage.setItem('ttm-tab-config', JSON.stringify(state.tabConfig));
+  } catch (e) {
+    console.error('Failed to save tab config', e);
+  }
+}
+
+function renderNavTabs() {
+  const nav = document.getElementById('main-nav');
+  const currentActive = nav.querySelector('.tab-btn.active')?.dataset?.panel || 'tabs';
+
+  nav.innerHTML = '';
+
+  const visibleTabs = state.tabConfig.filter(t => t.visible);
+
+  visibleTabs.forEach(tab => {
+    const btn = document.createElement('button');
+    btn.className = `tab-btn ${tab.id === currentActive ? 'active' : ''}`;
+    btn.dataset.panel = tab.id;
+    btn.innerHTML = `${tab.icon} ${escapeHtml(tab.label)}`;
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = document.getElementById(`panel-${tab.id}`);
+      if (panel) panel.classList.add('active');
+
+      if (tab.id === 'history') loadHistory();
+      if (tab.id === 'bookmarks') loadBookmarks();
+      if (tab.id === 'readingList') loadReadingList();
+    });
+    nav.appendChild(btn);
+  });
+
+  // Ensure an active panel exists, fallback to first visible tab
+  if (!visibleTabs.some(t => t.id === currentActive) && visibleTabs.length > 0) {
+    const firstId = visibleTabs[0].id;
+    nav.querySelector(`[data-panel="${firstId}"]`).classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`panel-${firstId}`).classList.add('active');
+  }
+}
+
+// ===== 設定パネル =====
+let dragSettingId = null;
+
+function renderSettingsPanel() {
+  const list = document.getElementById('tab-visibility-list');
+  list.innerHTML = '';
+
+  state.tabConfig.forEach((tab, index) => {
+    const item = document.createElement('div');
+    item.className = 'settings-item';
+    item.draggable = true;
+    item.dataset.id = tab.id;
+
+    const isSettings = tab.id === 'settings';
+    const checkboxDisabled = isSettings ? 'disabled' : '';
+    const checkedHtml = tab.visible ? 'checked' : '';
+
+    item.innerHTML = `
+      <div class="settings-item-drag">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm1 4a1 1 0 100 2h12a1 1 0 100-2H4z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="settings-item-label">
+        ${tab.icon} ${escapeHtml(tab.label)}
+      </div>
+      <input type="checkbox" class="settings-checkbox" ${checkedHtml} ${checkboxDisabled} title="${isSettings ? chrome.i18n.getMessage('settingsNotHideable') : chrome.i18n.getMessage('settingsToggle')}">
+    `;
+
+    // チェックボックス切り替え
+    const cb = item.querySelector('.settings-checkbox');
+    cb.addEventListener('change', (e) => {
+      tab.visible = e.target.checked;
+      saveTabConfig();
+      renderNavTabs();
+    });
+
+    // ドラッグ＆ドロップ設定
+    item.addEventListener('dragstart', (e) => {
+      dragSettingId = tab.id;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tab.id);
+    });
+
+    item.addEventListener('dragend', () => {
+      dragSettingId = null;
+      item.classList.remove('dragging');
+      document.querySelectorAll('.settings-item').forEach(el => {
+        el.classList.remove('drag-over-above', 'drag-over-below');
+      });
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (dragSettingId === tab.id) return;
+      const rect = item.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+
+      item.classList.remove('drag-over-above', 'drag-over-below');
+      if (y < rect.height / 2) {
+        item.classList.add('drag-over-above');
+      } else {
+        item.classList.add('drag-over-below');
+      }
+    });
+
+    item.addEventListener('dragleave', () => {
+      item.classList.remove('drag-over-above', 'drag-over-below');
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      item.classList.remove('drag-over-above', 'drag-over-below');
+      if (!dragSettingId || dragSettingId === tab.id) return;
+
+      const rect = item.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const insertAfter = y >= rect.height / 2;
+
+      const oldIndex = state.tabConfig.findIndex(t => t.id === dragSettingId);
+      const draggedTab = state.tabConfig[oldIndex];
+      const targetIndex = state.tabConfig.findIndex(t => t.id === tab.id);
+
+      // 配列を再構築
+      state.tabConfig.splice(oldIndex, 1);
+      const newTargetIndex = state.tabConfig.findIndex(t => t.id === tab.id);
+      state.tabConfig.splice(insertAfter ? newTargetIndex + 1 : newTargetIndex, 0, draggedTab);
+
+      saveTabConfig();
+      renderNavTabs();
+      renderSettingsPanel();
+    });
+
+    list.appendChild(item);
+  });
+
+  // その他の設定 - テーマカラー スウォッチ
+  function updateSwatchSelection(current) {
+    document.querySelectorAll('.color-swatch[data-color]').forEach(sw => {
+      sw.classList.toggle('selected', sw.dataset.color === current);
+    });
+    const customSwatch = document.querySelector('.color-swatch-custom');
+    if (customSwatch) {
+      const isCustom = current && current.startsWith('#') && !THEME_PRESETS[current];
+      customSwatch.classList.toggle('selected', isCustom);
+      if (isCustom) {
+        const inp = document.getElementById('setting-theme-custom');
+        if (inp) inp.value = current;
+      }
+    }
+  }
+
+  document.querySelectorAll('.color-swatch[data-color]').forEach(sw => {
+    sw.onclick = () => {
+      applyThemeColor(sw.dataset.color);
+      updateSwatchSelection(sw.dataset.color);
+      saveUserSettings(); // Clicking a swatch is a single action, save immediately
+    };
+  });
+
+  const customInput = document.getElementById('setting-theme-custom');
+  if (customInput) {
+    customInput.oninput = () => {
+      applyThemeColor(customInput.value);
+      updateSwatchSelection(customInput.value);
+      saveUserSettingsDebounced(); // Use debounced save during dragging
+    };
+    customInput.onchange = () => {
+      saveUserSettings(); // Save final value on change
+    };
+  }
+
+  updateSwatchSelection(state.userSettings.themeColor || 'blue');
+
+  const cbHistory = document.getElementById('setting-history-recent');
+  if (cbHistory) {
+    cbHistory.checked = state.userSettings.historyRecentlyClosed;
+    cbHistory.onchange = (e) => {
+      state.userSettings.historyRecentlyClosed = e.target.checked;
+      saveUserSettings();
+      if (document.getElementById('panel-history').classList.contains('active')) loadHistory();
+    };
+  }
+
+  const selColorScheme = document.getElementById('setting-color-scheme');
+  if (selColorScheme) {
+    selColorScheme.value = state.userSettings.colorScheme || 'auto';
+    selColorScheme.onchange = (e) => {
+      state.userSettings.colorScheme = e.target.value;
+      saveUserSettings();
+      applyColorScheme();
+    };
+  }
+
+  const cbBookmark = document.getElementById('setting-bookmark-visit');
+  if (cbBookmark) {
+    cbBookmark.checked = state.userSettings.bookmarkVisitCount;
+    cbBookmark.onchange = (e) => {
+      state.userSettings.bookmarkVisitCount = e.target.checked;
+      saveUserSettings();
+      if (document.getElementById('panel-bookmarks').classList.contains('active')) renderBookmarks();
+    };
+  }
+
+  const selDisplayMode = document.getElementById('setting-display-mode');
+  if (selDisplayMode) {
+    selDisplayMode.value = state.displayMode;
+    selDisplayMode.onchange = (e) => {
+      applyDisplayMode(e.target.value);
+    };
+  }
+
+  // サイドパネルの位置設定
+  const selSide = document.getElementById('setting-side-panel-side');
+  if (selSide) {
+    selSide.value = state.userSettings.sidePanelSide || 'right';
+    selSide.onchange = (e) => {
+      state.userSettings.sidePanelSide = e.target.value;
+      saveUserSettings();
+    };
+  }
+
+  // ミニツリーの幅設定
+  const sliderWidth = document.getElementById('setting-mini-tree-width');
+  const spanWidth = document.getElementById('mini-tree-width-value');
+  if (sliderWidth && spanWidth) {
+    const val = state.userSettings.miniTreeWidth || 90;
+    sliderWidth.value = val;
+    spanWidth.textContent = `${val}px`;
+    sliderWidth.oninput = (e) => {
+      const v = parseInt(e.target.value);
+      spanWidth.textContent = `${v}px`;
+      state.userSettings.miniTreeWidth = v;
+      saveUserSettingsDebounced();
+    };
+  }
+
+  renderShortcutsSettings();
+}
+
+function renderShortcutsSettings() {
+  const container = document.getElementById('shortcuts-settings-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  SHORTCUT_ACTIONS.forEach(action => {
+    const item = document.createElement('div');
+    item.className = 'settings-item-normal';
+
+    const label = document.createElement('div');
+    label.className = 'settings-item-label';
+    label.textContent = action.label;
+
+    const right = document.createElement('div');
+    right.style.display = 'flex';
+    right.style.gap = '8px';
+    right.style.alignItems = 'center';
+
+    const kbd = document.createElement('button');
+    kbd.className = 'shortcut-kbd-btn';
+    kbd.textContent = state.userSettings.shortcuts[action.id] || '---';
+
+    kbd.onclick = () => {
+      if (state.isRecordingShortcut) return;
+      state.isRecordingShortcut = true;
+      kbd.classList.add('recording');
+      kbd.textContent = chrome.i18n.getMessage('shortcutRecordPrompt');
+
+      const onKeyDown = (e) => {
+        // Alt, Ctrl, Shift, Meta 自体は無視して継続
+        if (['Alt', 'Control', 'Shift', 'Meta'].includes(e.key)) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Escapeでキャンセル
+        if (e.key === 'Escape') {
+          stopRecording();
+          return;
+        }
+
+        const shortcut = getShortcutString(e);
+        if (shortcut) {
+          state.userSettings.shortcuts[action.id] = shortcut;
+          saveUserSettings();
+          stopRecording();
+        }
+      };
+
+      const stopRecording = () => {
+        state.isRecordingShortcut = false;
+        kbd.classList.remove('recording');
+        kbd.textContent = state.userSettings.shortcuts[action.id] || '---';
+        window.removeEventListener('keydown', onKeyDown, true);
+        renderShortcutsSettings();
+      };
+
+      window.addEventListener('keydown', onKeyDown, true);
+    };
+
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'toolbar-btn';
+    resetBtn.title = chrome.i18n.getMessage('shortcutReset');
+    resetBtn.style.padding = '4px';
+    resetBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>`;
+    resetBtn.onclick = () => {
+      // デフォルトに戻す
+      const defaults = {
+        'new-tab': 'Alt+N',
+        'toggle-pinned': 'Alt+P',
+        'display-mode': 'Alt+D',
+        'sort-mode': 'Alt+S',
+        'collapse-all': 'Alt+Up',
+        'expand-all': 'Alt+Down',
+        'focus-search': '/',
+        'switch-tabs': 'Alt+1',
+        'switch-history': 'Alt+2',
+        'switch-bookmarks': 'Alt+3',
+        'switch-settings': 'Alt+4',
+        'toggle-mini-tree': 'Cmd+Shift+X'
+      };
+      state.userSettings.shortcuts[action.id] = defaults[action.id] || '';
+      saveUserSettings();
+      renderShortcutsSettings();
+    };
+
+    right.appendChild(kbd);
+    right.appendChild(resetBtn);
+    item.appendChild(label);
+    item.appendChild(right);
+    container.appendChild(item);
+  });
+}
 
 // ===== モーダル管理 =====
 function openModal(id) {
@@ -295,11 +931,33 @@ function hideContextMenu() {
 
 document.addEventListener('click', hideContextMenu);
 document.addEventListener('keydown', (e) => {
+  // ショートカット録画中は何もしない
+  if (state.isRecordingShortcut) return;
+
   if (e.key === 'Escape') {
     hideContextMenu();
     if (state.selectingParentFor != null) {
       cancelParentSelection();
       showToast('キャンセルしました');
+    }
+    return;
+  }
+
+  // 入力フィールドフォーカス時はスキップ（ただし検索フォーカスショートカットは除く）
+  const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+  const shortcut = getShortcutString(e);
+
+  if (!shortcut) return;
+
+  // ショートカット判定
+  for (const [actionId, key] of Object.entries(state.userSettings.shortcuts || {})) {
+    if (key === shortcut) {
+      // 検索へのフォーカス以外は入力中は無視
+      if (isInput && actionId !== 'focus-search') continue;
+
+      e.preventDefault();
+      handleShortcutAction(actionId);
+      break;
     }
   }
 });
@@ -309,6 +967,15 @@ document.addEventListener('keydown', (e) => {
 // 子・孫の総件数を再帰的にカウント
 function countDescendants(tab) {
   return (tab.children || []).reduce((n, c) => n + 1 + countDescendants(c), 0);
+}
+
+// 指定したタブとそのすべての子孫タブのIDを（見た目の順序通りに）取得する
+function getBranchIds(tab) {
+  let ids = [tab.id];
+  (tab.children || []).forEach(child => {
+    ids = ids.concat(getBranchIds(child));
+  });
+  return ids;
 }
 
 // ツリー構造を構築
@@ -342,15 +1009,15 @@ function buildTabTree(tabs, parents) {
 
 // Chrome タブグループの利用可能カラー
 const GROUP_COLORS = [
-  { name: 'grey',   label: 'グレー'   },
-  { name: 'blue',   label: 'ブルー'   },
-  { name: 'red',    label: 'レッド'   },
-  { name: 'yellow', label: 'イエロー' },
-  { name: 'green',  label: 'グリーン' },
-  { name: 'pink',   label: 'ピンク'   },
-  { name: 'purple', label: 'パープル' },
-  { name: 'cyan',   label: 'シアン'   },
-  { name: 'orange', label: 'オレンジ' },
+  { name: 'grey', label: chrome.i18n.getMessage('colorGrey') },
+  { name: 'blue', label: chrome.i18n.getMessage('colorBlue') },
+  { name: 'red', label: chrome.i18n.getMessage('colorRed') },
+  { name: 'yellow', label: chrome.i18n.getMessage('colorYellow') },
+  { name: 'green', label: chrome.i18n.getMessage('colorGreen') },
+  { name: 'pink', label: chrome.i18n.getMessage('colorPink') },
+  { name: 'purple', label: chrome.i18n.getMessage('colorPurple') },
+  { name: 'cyan', label: chrome.i18n.getMessage('colorCyan') },
+  { name: 'orange', label: chrome.i18n.getMessage('colorOrange') },
 ];
 
 // 任意のタブサブセットからサブツリーを構築（グループ内・未グループの両方で使用）
@@ -483,7 +1150,7 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
     },
     { separator: true },
     {
-      label: 'グループ名を変更',
+      label: chrome.i18n.getMessage('ctxEditGroupName'),
       icon: pencilIcon,
       action: async () => {
         const newTitle = prompt('グループ名:', groupInfo?.title || '');
@@ -498,7 +1165,7 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
     },
     { separator: true },
     {
-      label: 'グループを解除',
+      label: chrome.i18n.getMessage('ctxUngroup'),
       danger: true,
       icon: xIcon,
       action: async () => {
@@ -539,16 +1206,30 @@ function renderTabTree() {
   container.innerHTML = '';
 
   // 固定タブセクション（ソートモードに関わらず常にツリー形式）
-  if (pinnedRoots.length > 0 && state.showPinnedTabs) {
+  if (pinnedRoots.length > 0) {
     const pinnedSection = document.createElement('div');
     pinnedSection.className = 'pinned-section';
     const label = document.createElement('div');
-    label.className = 'section-label';
-    label.textContent = `📌 固定タブ (${pinnedTotal})`;
-    pinnedSection.appendChild(label);
-    pinnedRoots.forEach(tab => {
-      renderTabNode(pinnedSection, tab, 0);
+    label.className = `section-label collapsible-section ${state.showPinnedTabs ? '' : 'collapsed'}`;
+    label.innerHTML = `
+      <div class="section-toggle">
+        <svg viewBox="0 0 10 10" fill="currentColor"><path d="M2 3l3 4 3-4H2z"/></svg>
+      </div>
+      📌 固定タブ (${pinnedTotal})
+    `;
+
+    label.addEventListener('click', () => {
+      state.showPinnedTabs = !state.showPinnedTabs;
+      renderTabTree();
     });
+
+    pinnedSection.appendChild(label);
+
+    if (state.showPinnedTabs) {
+      pinnedRoots.forEach(tab => {
+        renderTabNode(pinnedSection, tab, 0);
+      });
+    }
     container.appendChild(pinnedSection);
   }
 
@@ -585,7 +1266,7 @@ function renderTabTree() {
   if (pinnedTotal === 0 && normalTabs.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3z"/></svg>
-      <p>タブが見つかりません</p>
+      <p>${chrome.i18n.getMessage('emptyTabs')}</p>
     </div>`;
   }
 }
@@ -622,7 +1303,7 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
   item.draggable = true;
 
   const indentPx = depth * 16 + 4;
-  const faviconUrl = tab.favIconUrl || getFaviconUrl(tab.url);
+  const faviconUrl = getFaviconUrl(tab.url);
 
   // 固定タブではピンボタンを非表示（右クリックメニューで操作可能）
   const showPinBtn = !tab.pinned;
@@ -634,47 +1315,58 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     ? `<span class="tab-group-dot-sm group-dot-${tabGroupInfo.color}" title="${escapeHtml(tabGroupInfo.title || 'グループ')}"></span>`
     : '';
 
+  const childIconHtml = depth > 0
+    ? `<div class="tab-child-connector"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2v7a2 2 0 002 2h6v-2.5l3.5 3.5-3.5 3.5v-2.5h-6a4 4 0 01-4-4v-7h2z"/></svg></div>`
+    : '';
+
+  // padding-left を使ってインデントすることで、右端のバッジが画面外に見切れるのを防ぐ
+  item.style.paddingLeft = `${indentPx}px`;
+
   item.innerHTML = `
-    <div class="tab-indent" style="width:${indentPx}px"></div>
-    <div class="tab-toggle ${hasChildren ? (isCollapsed ? 'collapsed' : '') : 'no-children'}">
+    <button class="tab-action-btn close-btn left-action" data-action="close" title="閉じる">
+      <svg viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+      </svg>
+    </button>
+    ${childIconHtml}
+    <div class="tab-drag-handle">
       <svg viewBox="0 0 10 10" fill="currentColor">
-        <path d="M2 3l3 4 3-4H2z"/>
+        <circle cx="3" cy="3" r="1"/><circle cx="7" cy="3" r="1"/>
+        <circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/>
+        <circle cx="3" cy="7" r="1"/><circle cx="7" cy="7" r="1"/>
       </svg>
     </div>
-    ${groupDotHtml}
-    ${faviconUrl
+    <div class="tab-content-wrapper">
+      ${groupDotHtml}
+      ${faviconUrl
       ? `<img class="tab-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="">`
       : ''
     }
-    ${!faviconUrl ? getDefaultFavicon() : `<span class="tab-favicon-default" style="display:none">${getDefaultFavicon()}</span>`}
-    ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>' : ''}
-    <div class="tab-info">
-      <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
-      ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
-    </div>
-    ${hasChildren ? (() => {
-      const total = countDescendants(tab);
-      return `<span class="desc-badge" title="${total}件の子孫タブ">${total}</span>`;
-    })() : ''}
-    <div class="tab-actions">
-      ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="固定">
-        <svg viewBox="0 0 20 20" fill="currentColor">
-          <path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/>
-        </svg>
-      </button>` : ''}
-      ${hasChildren ? (() => {
-        const total = countDescendants(tab);
-        return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="このタブと子タブをすべて閉じる（${total + 1}個）">
+      ${!faviconUrl ? getDefaultFavicon() : `<span class="tab-favicon-default" style="display:none">${getDefaultFavicon()}</span>`}
+      ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>' : ''}
+      <div class="tab-info">
+        <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
+        ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
+      </div>
+      <div class="tab-actions">
+        ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="固定">
           <svg viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            <path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/>
           </svg>
-        </button>`;
-      })() : ''}
-      <button class="tab-action-btn close-btn" data-action="close" title="閉じる">
-        <svg viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-        </svg>
-      </button>
+        </button>` : ''}
+        ${hasChildren ? (() => {
+      const total = countDescendants(tab);
+      return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="このタブと子タブをすべて閉じる（${total + 1}個）">
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+              </svg>
+            </button>`;
+    })() : ''}
+      </div>
+      ${hasChildren ? (() => {
+      const total = countDescendants(tab);
+      return `<span class="desc-badge clickable-toggle ${isCollapsed ? 'collapsed' : ''}" title="${isCollapsed ? '展開' : '折りたたみ'}（${total}件の子孫タブ）">${total}</span>`;
+    })() : ''}
     </div>
   `;
 
@@ -706,10 +1398,10 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     activateTab(tab.id, tab.windowId);
   });
 
-  // 折りたたみトグル
-  const toggle = item.querySelector('.tab-toggle');
-  if (toggle && hasChildren) {
-    toggle.addEventListener('click', (e) => {
+  // 折りたたみトグル（件数バッジをクリック）
+  const badgeToggle = item.querySelector('.desc-badge.clickable-toggle');
+  if (badgeToggle && hasChildren) {
+    badgeToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleTabCollapse(tab.id);
     });
@@ -759,25 +1451,26 @@ function showTabContextMenu(x, y, tab) {
   const isRecentMode = state.tabSortMode === 'recent';
 
   const ICON = {
-    pin:    `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>`,
-    child:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>`,
-    ungroup:`<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
-    tag:    `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>`,
-    down:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
-    lift:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>`,
-    trash:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
-    left:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>`,
+    pin: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>`,
+    child: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>`,
+    ungroup: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    tag: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>`,
+    down: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    lift: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>`,
+    trash: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+    left: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>`,
     domain: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v1h1a2 2 0 012 2v5a2 2 0 01-2 2H4a2 2 0 01-2-2v-5a2 2 0 012-2h1zm8-2v1H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>`,
-    up:     `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>`,
+    up: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>`,
     pencil: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
-    copy:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/><path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`,
-    close:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    copy: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/><path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`,
+    close: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    readingList: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M9 4.804A7.993 7.993 0 002 8c0 .344.033.677.095 1H5.82a2 2 0 011.61 1.61l.17.68h3.805a2 2 0 011.61-1.61l.17-.68h3.725c.062-.323.095-.656.095-1 0-3.196-2.6-5.804-5.804-5.804z"/><path d="M10 5.804c.344 0 .677.033 1 .095v3.424a2 2 0 01-1.61 1.61l-.68.17v3.801a2 2 0 011.61-1.61l.68-.17h3.424A7.993 7.993 0 0011 11c0-.344-.033-.677-.095-1V6.576a2 2 0 011.61-1.61l.68-.17V1.031A8.003 8.003 0 0010 1c-3.196 0-5.804 2.6-5.804 5.804v3.424A2 2 0 012.586 11.838l.68.17V15.809a2 2 0 01-1.61 1.61l-.68.17v3.424A7.993 7.993 0 005 21c3.196 0 5.804-2.6 5.804-5.804v-3.424a2 2 0 01-1.61-1.61l-.68-.17V6.576c3.196 0 5.804-2.6 5.804-5.804V1.03a8.003 8.003 0 00-1 .095V5.804z"/></svg>`,
   };
 
   const menuItems = [
     // ─── 基本操作（全モード共通）───
     {
-      label: tab.pinned ? '固定を解除' : 'タブを固定',
+      label: tab.pinned ? chrome.i18n.getMessage('ctxUnpinTab') : chrome.i18n.getMessage('ctxPinTab'),
       icon: ICON.pin,
       action: () => toggleTabPin(tab.id, !tab.pinned)
     },
@@ -797,7 +1490,7 @@ function showTabContextMenu(x, y, tab) {
     if (tabGroupId !== undefined) {
       // グループ内のタブ → 除外のみ
       menuItems.push({
-        label: 'グループから除外',
+        label: chrome.i18n.getMessage('ctxRemoveFromGroup'),
         icon: ICON.ungroup,
         action: async () => {
           try {
@@ -868,7 +1561,7 @@ function showTabContextMenu(x, y, tab) {
       menuItems.push(
         { separator: true },
         {
-          label: '子ツリーを1つ上に移動',
+          label: chrome.i18n.getMessage('ctxMoveTreeUp'),
           icon: ICON.lift,
           action: () => moveChildrenToParentLevel(tab.id)
         },
@@ -901,14 +1594,14 @@ function showTabContextMenu(x, y, tab) {
           action: () => aggregateSameDomain(tab.id, sameDomainTabs)
         });
       }
-    } catch {}
+    } catch { }
 
     // 1つ上の階層へ移動
     const parentTabId = state.tabParents[tab.id];
     if (parentTabId && state.tabs.find(t => t.id === parentTabId)) {
       const grandParentId = state.tabParents[parentTabId] || null;
       menuItems.push({
-        label: '1つ上のツリーの子にする',
+        label: chrome.i18n.getMessage('ctxMoveToGrandparent'),
         icon: ICON.up,
         action: () => moveToGrandParentLevel(tab.id, grandParentId)
       });
@@ -919,20 +1612,36 @@ function showTabContextMenu(x, y, tab) {
   menuItems.push(
     { separator: true },
     {
-      label: '名前を編集',
+      label: chrome.i18n.getMessage('ctxEditName'),
       icon: ICON.pencil,
       action: () => editTabName(tab)
     },
     {
-      label: 'URLをコピー',
+      label: chrome.i18n.getMessage('ctxCopyUrl'),
       icon: ICON.copy,
       action: () => {
-        navigator.clipboard.writeText(tab.url).then(() => showToast('URLをコピーしました', 'success'));
+        navigator.clipboard.writeText(tab.url).then(() => showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success'));
+      }
+    },
+    {
+      label: chrome.i18n.getMessage('ctxAddToReadingList'),
+      icon: ICON.readingList,
+      action: async () => {
+        try {
+          await chrome.readingList.addEntry({
+            title: tab.title,
+            url: tab.url,
+            hasBeenRead: false
+          });
+          showToast(chrome.i18n.getMessage('toastAddedToReadingList'), 'success');
+        } catch (e) {
+          showToast('追加に失敗しました (既に存在する可能性があります)', 'error');
+        }
       }
     },
     { separator: true },
     {
-      label: hasChildren && !isRecentMode ? 'このタブを閉じる' : 'タブを閉じる',
+      label: hasChildren && !isRecentMode ? 'このタブを閉じる' : chrome.i18n.getMessage('ctxCloseTab'),
       danger: true,
       icon: ICON.close,
       action: () => closeTab(tab.id)
@@ -1040,7 +1749,7 @@ async function aggregateSameDomain(parentTabId, sameDomainTabs) {
 async function moveToGrandParentLevel(tabId, grandParentId) {
   try {
     await sendMessage('SET_TAB_PARENT', { tabId, parentId: grandParentId });
-    showToast('タブを1つ上のレベルに移動しました', 'success');
+    showToast(chrome.i18n.getMessage('toastTabLevelUp'), 'success');
     await refreshTabTree();
   } catch (err) {
     console.error('Failed to move tab:', err);
@@ -1064,8 +1773,8 @@ async function editTabName(tab) {
     try {
       localStorage.removeItem(`ttm-custom-name-${tab.id}`);
       localStorage.removeItem(`ttm-custom-name-url-${tab.url}`);
-    } catch {}
-    showToast('タブ名をリセットしました', 'success');
+    } catch { }
+    showToast(chrome.i18n.getMessage('toastTabNameReset'), 'success');
   } else {
     // 新しい名前を設定
     state.customTabNames[tab.id] = newName.trim();
@@ -1073,8 +1782,8 @@ async function editTabName(tab) {
     try {
       localStorage.setItem(`ttm-custom-name-${tab.id}`, newName.trim());
       localStorage.setItem(`ttm-custom-name-url-${tab.url}`, newName.trim());
-    } catch {}
-    showToast('タブ名を更新しました', 'success');
+    } catch { }
+    showToast(chrome.i18n.getMessage('toastTabNameUpdated'), 'success');
   }
 
   renderTabTree();
@@ -1091,7 +1800,7 @@ function getTabDisplayName(tab) {
     return state.tabCustomNamesByUrl[tab.url];
   }
   // 3. デフォルトタイトル
-  return tab.title || '(タイトルなし)';
+  return tab.title || '(No Title)';
 }
 
 // タブ操作
@@ -1099,7 +1808,7 @@ async function activateTab(tabId, windowId) {
   try {
     // 最近開いた時刻を記録（最近開いた順ソート用）
     state.tabActivationTime[tabId] = Date.now();
-    try { localStorage.setItem(`ttm-tab-activation-${tabId}`, state.tabActivationTime[tabId]); } catch {}
+    try { localStorage.setItem(`ttm-tab-activation-${tabId}`, state.tabActivationTime[tabId]); } catch { }
 
     await sendMessage('ACTIVATE_TAB', { tabId, windowId });
   } catch (e) {
@@ -1118,7 +1827,7 @@ async function closeTab(tabId) {
 async function toggleTabPin(tabId, pinned) {
   try {
     await sendMessage('PIN_TAB', { tabId, pinned });
-    showToast(pinned ? 'タブを固定しました' : '固定を解除しました', 'success');
+    showToast(pinned ? chrome.i18n.getMessage('toastPinned') : chrome.i18n.getMessage('toastUnpinned'), 'success');
     await refreshTabTree();
   } catch (e) {
     console.error('Failed to pin tab:', e);
@@ -1167,6 +1876,14 @@ async function createChildTab(parentTabId) {
 }
 
 // ===== ドラッグ&ドロップ =====
+// ドラッグ&ドロップのゾーン判定ヘルパー
+function getTabDropZone(y, h) {
+  const threshold = 0.4; // 上下40%を並び替え、中央20%を親子判定にする
+  if (y < h * threshold) return 'above';
+  if (y > h * (1 - threshold)) return 'below';
+  return 'inside';
+}
+
 let dragTabId = null;
 
 function setupDragAndDrop(item, tab) {
@@ -1188,22 +1905,25 @@ function setupDragAndDrop(item, tab) {
   item.addEventListener('dragover', (e) => {
     e.preventDefault();
     if (dragTabId === tab.id) return;
+
+    // 最新のドラッグ中タブとターゲットタブの情報を取得
+    const draggedTab = state.tabs.find(t => t.id === dragTabId);
+    if (!draggedTab) return;
+
+    // 固定タブ↔非固定タブ間の移動は禁止（視覚的フィードバックを無効化）
+    if (draggedTab.pinned !== tab.pinned) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+
     const rect = item.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const h = rect.height;
+    const zone = getTabDropZone(y, h);
 
     item.classList.remove('drag-over-above', 'drag-over-below', 'drag-over-inside');
-
-    if (y < h * 0.25) {
-      item.classList.add('drag-over-above');
-      e.dataTransfer.dropEffect = 'move';
-    } else if (y > h * 0.75) {
-      item.classList.add('drag-over-below');
-      e.dataTransfer.dropEffect = 'move';
-    } else {
-      item.classList.add('drag-over-inside');
-      e.dataTransfer.dropEffect = 'move';
-    }
+    item.classList.add(`drag-over-${zone}`);
+    e.dataTransfer.dropEffect = 'move';
   });
 
   item.addEventListener('dragleave', () => {
@@ -1212,67 +1932,88 @@ function setupDragAndDrop(item, tab) {
 
   item.addEventListener('drop', async (e) => {
     e.preventDefault();
-    item.classList.remove('drag-over-above', 'drag-over-below', 'drag-over-inside');
-    if (!dragTabId || dragTabId === tab.id) return;
-
     const rect = item.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const h = rect.height;
+    const zone = getTabDropZone(y, h);
 
-    const draggedTab = state.tabs.find(t => t.id === dragTabId);
-    if (!draggedTab) return;
+    item.classList.remove('drag-over-above', 'drag-over-below', 'drag-over-inside');
 
-    // 固定タブ↔非固定タブ間のドロップは無効
-    if (draggedTab.pinned !== tab.pinned) return;
+    if (!dragTabId || dragTabId === tab.id) return;
 
     try {
-      if (y >= h * 0.25 && y <= h * 0.75) {
+      // 動的に最新の物理情報を取得
+      const latestTabs = await chrome.tabs.query({ currentWindow: true });
+      const currentDraggedTab = latestTabs.find(t => t.id === dragTabId);
+      const currentTargetTab = latestTabs.find(t => t.id === tab.id);
+
+      if (!currentDraggedTab || !currentTargetTab) return;
+      if (currentDraggedTab.pinned !== currentTargetTab.pinned) return;
+
+      // ドラッグしているタブ（およびその全子孫）のIDリスト
+      // state.tabs から現在の枝の構造を取得するために、まず現在の state.tabs を元にした tree 内で対象を探す
+      const findInTree = (nodes, id) => {
+        for (const n of nodes) {
+          if (n.id === id) return n;
+          if (n.children) {
+            const found = findInTree(n.children, id);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const tree = buildSubTree(state.tabs, state.tabParents);
+      const draggedNode = findInTree(tree, dragTabId);
+      const targetNode = findInTree(tree, tab.id);
+
+      if (!draggedNode || !targetNode) return;
+
+      const idsToMove = getBranchIds(draggedNode);
+
+      if (zone === 'inside') {
         // ─── 内側ドロップ: ドロップ先の子タブにする ───
         await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId: tab.id });
 
-        // Chrome本体のタブ位置を同期（親の直後に移動）
-        // ドラッグ元が親より前にある場合、親は1つ前にずれるので +0、後ろなら +1
-        if (draggedTab.windowId === tab.windowId) {
-          const insideIndex = draggedTab.index < tab.index ? tab.index : tab.index + 1;
+        if (currentDraggedTab.windowId === currentTargetTab.windowId) {
+          // 子にする場合、親の物理位置の直後（既存の子タブがいればそのさらに後）へ
+          const descendantCount = countDescendants(targetNode);
+          const targetIndex = currentTargetTab.index + descendantCount + 1;
+          const finalIndex = currentDraggedTab.index < targetIndex ? targetIndex - idsToMove.length : targetIndex;
+
           try {
-            await chrome.tabs.move(dragTabId, { index: insideIndex });
-          } catch {
-            // グループ境界制約などで位置同期できない場合はスキップ
-          }
+            await chrome.tabs.move(idsToMove, { index: finalIndex });
+          } catch (e) { console.warn('Branch move failed', e); }
         }
       } else {
         // ─── 上/下ドロップ: ドロップ先と同じ親にする ───
         const parentId = state.tabParents[tab.id] || null;
         await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId });
 
-        // Chrome本体のタブ位置を同期
-        // chrome.tabs.move() はタブ除去後の配列に対してインデックスを適用するため、
-        // ドラッグ元の元位置を考慮して計算する必要がある
-        if (draggedTab.windowId === tab.windowId) {
-          let targetIndex;
-          if (y < h * 0.25) {
-            // 上に挿入: ターゲットの直前
-            // ドラッグ元が前 → 除去でターゲットが1つ前にずれる → tab.index - 1
-            // ドラッグ元が後 → ターゲット位置そのまま → tab.index
-            targetIndex = draggedTab.index < tab.index ? tab.index - 1 : tab.index;
+        if (currentDraggedTab.windowId === currentTargetTab.windowId) {
+          let moveToIndex;
+          if (zone === 'above') {
+            moveToIndex = currentTargetTab.index;
           } else {
-            // 下に挿入: ターゲットの直後
-            // ドラッグ元が前 → 除去でターゲットが1つ前にずれる → tab.index（ずれた位置の次）
-            // ドラッグ元が後 → ターゲット位置そのまま → tab.index + 1
-            targetIndex = draggedTab.index < tab.index ? tab.index : tab.index + 1;
+            // 下に挿入する場合、ターゲットの子孫をすべて含めた後ろに配置
+            const descendantCount = countDescendants(targetNode);
+            moveToIndex = currentTargetTab.index + descendantCount + 1;
           }
+
+          // 自己移動によるズレを補正
+          const finalIndex = currentDraggedTab.index < moveToIndex ? moveToIndex - idsToMove.length : moveToIndex;
+
           try {
-            await chrome.tabs.move(dragTabId, { index: targetIndex });
-          } catch {
-            // グループ境界制約などで位置同期できない場合はスキップ
-          }
+            if (finalIndex !== currentDraggedTab.index && finalIndex >= 0) {
+              await chrome.tabs.move(idsToMove, { index: finalIndex });
+            }
+          } catch (e) { console.warn('Branch move failed', e); }
         }
       }
     } catch (err) {
       console.error('Failed to reorder tab:', err);
       showToast('タブの移動に失敗しました', 'error');
     } finally {
-      // 成功・失敗に関わらず必ずツリーを更新（インデックス陳腐化を防ぐ）
       await refreshTabTree();
     }
   });
@@ -1294,7 +2035,7 @@ async function loadTabs() {
     try {
       const stored = localStorage.getItem(`ttm-tab-activation-${tab.id}`);
       if (stored) state.tabActivationTime[tab.id] = parseInt(stored, 10);
-    } catch {}
+    } catch { }
   });
 
   // カスタム名を復元（tabId経由）
@@ -1302,7 +2043,7 @@ async function loadTabs() {
     try {
       const customName = localStorage.getItem(`ttm-custom-name-${tab.id}`);
       if (customName) state.customTabNames[tab.id] = customName;
-    } catch {}
+    } catch { }
   });
 
   // カスタム名を復元（URL経由：同じURLの再訪時用）
@@ -1316,7 +2057,7 @@ async function loadTabs() {
           state.customTabNames[tab.id] = customNameByUrl;
         }
       }
-    } catch {}
+    } catch { }
   });
 
   // グループ情報を取得（タブ一覧の groupId を直接利用して効率化）
@@ -1364,12 +2105,7 @@ document.getElementById('btn-new-tab').addEventListener('click', () => {
 document.getElementById('btn-collapse-all').addEventListener('click', collapseAll);
 document.getElementById('btn-expand-all').addEventListener('click', expandAll);
 
-document.getElementById('btn-toggle-pinned').addEventListener('click', () => {
-  state.showPinnedTabs = !state.showPinnedTabs;
-  renderTabTree();
-  const msg = state.showPinnedTabs ? '固定タブを表示しました' : '固定タブを非表示にしました';
-  showToast(msg);
-});
+// 以前のボタンは削除（セクションヘッダーがトグルになったため）
 
 document.getElementById('btn-save-session').addEventListener('click', () => {
   const input = document.getElementById('session-name-input');
@@ -1383,9 +2119,9 @@ document.getElementById('btn-confirm-save').addEventListener('click', async () =
   try {
     await sendMessage('SAVE_SESSION', { name: name || undefined });
     closeModal('modal-save-session');
-    showToast('セッションを保存しました', 'success');
+    showToast(chrome.i18n.getMessage('toastSessionSaved'), 'success');
   } catch (e) {
-    showToast('保存に失敗しました', 'error');
+    showToast(chrome.i18n.getMessage('toastSessionSaveFailed'), 'error');
   }
 });
 
@@ -1396,14 +2132,14 @@ document.getElementById('btn-load-session').addEventListener('click', async () =
 
 async function loadSessionList() {
   const list = document.getElementById('session-list');
-  list.innerHTML = '<div class="loading">読み込み中...</div>';
+  list.innerHTML = `<div class="loading">${chrome.i18n.getMessage('msgLoading')}</div>`;
 
   try {
     const resp = await sendMessage('LOAD_SESSIONS');
     const sessions = resp?.sessions || [];
 
     if (sessions.length === 0) {
-      list.innerHTML = '<div class="no-sessions">保存されたセッションがありません</div>';
+      list.innerHTML = `<div class="no-sessions">${chrome.i18n.getMessage('emptySessions')}</div>`;
       return;
     }
 
@@ -1432,9 +2168,9 @@ async function loadSessionList() {
         try {
           await sendMessage('RESTORE_SESSION', { sessionId: session.id });
           closeModal('modal-load-session');
-          showToast('セッションを復元しました', 'success');
+          showToast(chrome.i18n.getMessage('toastSessionRestored'), 'success');
         } catch {
-          showToast('復元に失敗しました', 'error');
+          showToast(chrome.i18n.getMessage('toastSessionRestoreFailed'), 'error');
         }
       });
 
@@ -1442,13 +2178,13 @@ async function loadSessionList() {
         e.stopPropagation();
         await sendMessage('DELETE_SESSION', { sessionId: session.id });
         await loadSessionList();
-        showToast('セッションを削除しました');
+        showToast(chrome.i18n.getMessage('toastSessionDeleted'));
       });
 
       list.appendChild(item);
     });
   } catch (e) {
-    list.innerHTML = '<div class="no-sessions">読み込みに失敗しました</div>';
+    list.innerHTML = `<div class="no-sessions">${chrome.i18n.getMessage('emptySessionLoadFail')}</div>`;
   }
 }
 
@@ -1457,9 +2193,16 @@ let historySearchTimeout = null;
 
 async function loadHistory(query = '') {
   const container = document.getElementById('history-list');
-  container.innerHTML = '<div class="loading">読み込み中...</div>';
+  container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
 
   try {
+    let recentSessions = [];
+    if (state.userSettings.historyRecentlyClosed && !query) {
+      recentSessions = await new Promise((resolve) => {
+        chrome.sessions.getRecentlyClosed({ maxResults: 10 }, (sessions) => resolve(sessions || []));
+      });
+    }
+
     const resp = await sendMessage('GET_HISTORY', {
       query,
       maxResults: 200,
@@ -1468,19 +2211,19 @@ async function loadHistory(query = '') {
 
     const items = resp?.history || [];
     state.historyItems = items;
-    renderHistory(items, query);
+    renderHistory(items, query, recentSessions);
   } catch (e) {
-    container.innerHTML = '<div class="empty-state"><p>履歴の読み込みに失敗しました</p></div>';
+    container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyHistoryLoadFail')}</p></div>`;
   }
 }
 
-function renderHistory(items, query = '') {
+function renderHistory(items, query = '', recentSessions = []) {
   const container = document.getElementById('history-list');
 
   if (items.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd"/></svg>
-      <p>履歴が見つかりません</p>
+      <p>${chrome.i18n.getMessage('emptyHistory')}</p>
     </div>`;
     return;
   }
@@ -1494,6 +2237,70 @@ function renderHistory(items, query = '') {
   });
 
   container.innerHTML = '';
+
+  // 最近閉じたタブを描画
+  if (recentSessions.length > 0) {
+    const recentGroupEl = document.createElement('div');
+    recentGroupEl.className = 'history-group';
+
+    const recentDateEl = document.createElement('div');
+    recentDateEl.className = 'history-date';
+    recentDateEl.textContent = chrome.i18n.getMessage('recentlyClosedHeader');
+    recentGroupEl.appendChild(recentDateEl);
+
+    recentSessions.forEach(session => {
+      let extItem = null;
+      let isWindow = false;
+      if (session.tab) extItem = session.tab;
+      else if (session.window) {
+        extItem = { title: `${session.window.tabs.length} tabs`, url: '', lastModified: session.lastModified };
+        isWindow = true; // For now simplify representation of window
+      }
+      if (!extItem) return;
+
+      const el = document.createElement('div');
+      el.className = 'history-item';
+
+      const faviconUrl = isWindow ? '' : getFaviconUrl(extItem.url);
+      const title = extItem.title || extItem.url;
+      const url = extItem.url || '';
+
+      el.innerHTML = `
+        ${isWindow
+          ? `<svg class="history-favicon" viewBox="0 0 20 20" fill="currentColor" style="color:var(--text-muted)"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>`
+          : (faviconUrl ? `<img class="history-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">` : `<svg class="history-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`)
+        }
+        <div class="history-info">
+          <div class="history-title">${escapeHtml(title)}</div>
+          <div class="history-url">${escapeHtml(url)}</div>
+        </div>
+        <div class="history-time">${formatTime(session.lastModified * 1000)}</div>
+        <button class="history-remove" title="Restore">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+        </button>
+      `;
+
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.history-remove')) {
+          chrome.sessions.restore(session.sessionId);
+          el.remove();
+        } else {
+          if (!isWindow) chrome.tabs.create({ url: extItem.url });
+        }
+      });
+      recentGroupEl.appendChild(el);
+    });
+    container.appendChild(recentGroupEl);
+
+    // Add separator if there are standard history items
+    if (Object.keys(groups).length > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'history-date';
+      sep.style.marginTop = '16px';
+      sep.textContent = chrome.i18n.getMessage('historyListHeader');
+      container.appendChild(sep);
+    }
+  }
   Object.entries(groups).forEach(([date, dateItems]) => {
     const groupEl = document.createElement('div');
     groupEl.className = 'history-group';
@@ -1536,7 +2343,7 @@ function renderHistory(items, query = '') {
         e.stopPropagation();
         await chrome.history.deleteUrl({ url: item.url });
         el.remove();
-        showToast('履歴から削除しました');
+        showToast(chrome.i18n.getMessage('toastHistoryDeleted'));
       });
 
       groupEl.appendChild(el);
@@ -1562,6 +2369,11 @@ document.getElementById('history-search').addEventListener('input', (e) => {
   }, 300);
 });
 
+document.getElementById('btn-refresh-history').addEventListener('click', () => {
+  const query = document.getElementById('history-search').value.trim();
+  loadHistory(query);
+});
+
 // ===== ブックマークパネル =====
 let bookmarkSearchTimeout = null;
 
@@ -1572,7 +2384,7 @@ async function loadBookmarks() {
     return;
   }
 
-  container.innerHTML = '<div class="loading">読み込み中...</div>';
+  container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
 
   try {
     const [tree, recentHistory] = await Promise.all([
@@ -1595,7 +2407,7 @@ async function loadBookmarks() {
 
     renderBookmarks();
   } catch (e) {
-    container.innerHTML = '<div class="empty-state"><p>ブックマークの読み込みに失敗しました</p></div>';
+    container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyBookmarkLoadFail')}</p></div>`;
   }
 }
 
@@ -1676,8 +2488,12 @@ function createBookmarkItem(item, query = '') {
   const title = highlightText(item.title || item.url, query);
   let dateStr = '';
   if (state.bookmarkSortMode === 'most-visited') {
-    const count = state.visitCountMap[item.url] || 0;
-    dateStr = count > 0 ? `${count.toLocaleString()}回` : '';
+    if (state.userSettings.bookmarkVisitCount) {
+      const count = state.visitCountMap[item.url] || 0;
+      dateStr = count > 0 ? `${count.toLocaleString()}回` : '';
+    } else {
+      dateStr = '';
+    }
   } else {
     const usedTime = state.recentlyUsedBookmarks[item.url];
     dateStr = usedTime ? formatTime(usedTime) : (item.dateAdded ? formatTime(item.dateAdded) : '');
@@ -1690,6 +2506,12 @@ function createBookmarkItem(item, query = '') {
     }
     <div class="bookmark-info">
       <div class="bookmark-title">${title}</div>
+      ${(state.bookmarkSortMode !== 'tree' && item.folderPath) ? `<div class="bookmark-path" title="${escapeHtml(item.folderPath)}">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+        </svg>
+        <span>${escapeHtml(item.folderPath)}</span>
+      </div>` : ''}
       <div class="bookmark-url">${escapeHtml(item.url)}</div>
     </div>
     ${dateStr ? `<div class="bookmark-date">${escapeHtml(dateStr)}</div>` : ''}
@@ -1704,15 +2526,54 @@ function createBookmarkItem(item, query = '') {
     e.preventDefault();
     showContextMenu(e.clientX, e.clientY, [
       {
-        label: '新しいタブで開く',
+        label: chrome.i18n.getMessage('ctxOpenNewTab'),
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/></svg>`,
         action: () => chrome.tabs.create({ url: item.url })
       },
       {
-        label: 'URLをコピー',
+        label: chrome.i18n.getMessage('ctxCopyUrl'),
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/></svg>`,
         action: () => {
-          navigator.clipboard.writeText(item.url).then(() => showToast('URLをコピーしました', 'success'));
+          navigator.clipboard.writeText(item.url).then(() => showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success'));
+        }
+      },
+      { separator: true },
+      {
+        label: chrome.i18n.getMessage('ctxEdit'),
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
+        action: async () => {
+          const newTitle = prompt('新しいタイトルを入力してください:', item.title);
+          if (newTitle === null) return;
+          const newUrl = prompt('新しいURLを入力してください:', item.url);
+          if (newUrl === null) return;
+
+          try {
+            await chrome.bookmarks.update(item.id, { title: newTitle, url: newUrl });
+            showToast(chrome.i18n.getMessage('toastBookmarkUpdated'), 'success');
+            state.bookmarkTree = null;
+            loadBookmarks();
+          } catch (err) {
+            console.error('Failed to update bookmark', err);
+            showToast(chrome.i18n.getMessage('toastBookmarkUpdateFailed'), 'error');
+          }
+        }
+      },
+      {
+        label: chrome.i18n.getMessage('ctxDelete'),
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+        danger: true,
+        action: async () => {
+          if (confirm(`「${item.title || item.url}」を削除しますか？`)) {
+            try {
+              await chrome.bookmarks.remove(item.id);
+              showToast(chrome.i18n.getMessage('toastBookmarkDeleted'), 'success');
+              state.bookmarkTree = null;
+              loadBookmarks();
+            } catch (err) {
+              console.error('Failed to remove bookmark', err);
+              showToast(chrome.i18n.getMessage('toastBookmarkDeleteFailed'), 'error');
+            }
+          }
         }
       }
     ]);
@@ -1746,7 +2607,7 @@ function renderBookmarkTree(container, nodes) {
           <svg class="bookmark-folder-icon" viewBox="0 0 20 20" fill="currentColor">
             <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
           </svg>
-          <span class="bookmark-folder-name">${escapeHtml(node.title || 'フォルダ')}</span>
+          <span class="bookmark-folder-name">${escapeHtml(node.title || chrome.i18n.getMessage('defaultFolder'))}</span>
           <span class="bookmark-folder-count">${countBookmarks(node.children)}</span>
         `;
         header.addEventListener('click', () => {
@@ -1780,15 +2641,46 @@ function countBookmarks(nodes) {
   return count;
 }
 
-// ソートボタン
+// ソートボタン機能
+function updateVisitCountToggleBtn() {
+  const toggleBtn = document.getElementById('btn-toggle-visit-count');
+  if (!toggleBtn) return;
+  if (state.bookmarkSortMode === 'most-visited') {
+    toggleBtn.classList.remove('hidden');
+    if (state.userSettings.bookmarkVisitCount) {
+      toggleBtn.style.color = "var(--theme-color)";
+      toggleBtn.style.background = "color-mix(in srgb, var(--theme-color) 12%, transparent)";
+    } else {
+      toggleBtn.style.color = "var(--text-muted)";
+      toggleBtn.style.background = "var(--bg-tertiary)";
+    }
+  } else {
+    toggleBtn.classList.add('hidden');
+  }
+}
+
 document.querySelectorAll('.sort-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.bookmarkSortMode = btn.dataset.sort;
+    updateVisitCountToggleBtn();
     renderBookmarks();
   });
 });
+
+const vcToggle = document.getElementById('btn-toggle-visit-count');
+if (vcToggle) {
+  vcToggle.addEventListener('click', () => {
+    state.userSettings.bookmarkVisitCount = !state.userSettings.bookmarkVisitCount;
+    saveUserSettings();
+    updateVisitCountToggleBtn();
+    const cbBookmark = document.getElementById('setting-bookmark-visit');
+    if (cbBookmark) cbBookmark.checked = state.userSettings.bookmarkVisitCount;
+    renderBookmarks();
+  });
+}
+updateVisitCountToggleBtn();
 
 // ブックマーク検索
 document.getElementById('bookmark-search').addEventListener('input', (e) => {
@@ -1798,6 +2690,131 @@ document.getElementById('bookmark-search').addEventListener('input', (e) => {
     renderBookmarks();
   }, 200);
 });
+
+// ===== リーディングリストパネル =====
+let readingListSearchTimeout = null;
+let readingListQuery = '';
+
+async function loadReadingList() {
+  const container = document.getElementById('reading-list-container');
+  if (!container) return;
+  container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
+
+  try {
+    const entries = await chrome.readingList.query({});
+    renderReadingList(entries);
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><p>リーディングリストの読み込みに失敗しました</p></div>`;
+  }
+}
+
+function renderReadingList(entries) {
+  const container = document.getElementById('reading-list-container');
+  if (!container) return;
+
+  let filtered = entries;
+  if (readingListQuery) {
+    const q = readingListQuery.toLowerCase();
+    filtered = entries.filter(e =>
+      (e.title || '').toLowerCase().includes(q) ||
+      (e.url || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 12h5v2h-5zM10 9h5v2h-5zM10 6h5v2h-5zM9 13v-1H4a1 1 0 01-1-1V5a1 1 0 011-1h5V3a1 1 0 011-1h6a1 1 0 011 1v10a1 1 0 01-1 1h-6a1 1 0 01-1-1zM5 11h3V5H5v6z"/></svg>
+      <p>リーディングリストは空です</p>
+    </div>`;
+    return;
+  }
+
+  // 未読を先に表示、次に更新日時順
+  filtered.sort((a, b) => {
+    if (a.hasBeenRead === b.hasBeenRead) return (b.lastUpdateTime || 0) - (a.lastUpdateTime || 0);
+    return a.hasBeenRead ? 1 : -1;
+  });
+
+  container.innerHTML = '';
+  filtered.forEach(entry => {
+    const el = document.createElement('div');
+    el.className = `history-item reading-list-item ${entry.hasBeenRead ? 'read' : 'unread'}`;
+    const faviconUrl = getFaviconUrl(entry.url);
+
+    el.innerHTML = `
+      ${faviconUrl
+        ? `<img class="history-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
+        : `<svg class="history-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
+      }
+      <div class="history-info">
+        <div class="history-title">${highlightText(entry.title || entry.url, readingListQuery)}</div>
+        <div class="history-url">${highlightText(entry.url, readingListQuery)}</div>
+      </div>
+      <div class="reading-list-actions">
+        <button class="action-btn-sm toggle-read" title="${entry.hasBeenRead ? '未読にする' : '既読にする'}">
+          ${entry.hasBeenRead
+        ? '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>'
+        : '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>'
+      }
+        </button>
+        <button class="action-btn-sm remove-entry" title="削除">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </button>
+      </div>
+    `;
+
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      chrome.tabs.create({ url: entry.url });
+    });
+
+    el.querySelector('.toggle-read').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await chrome.readingList.updateEntry({
+          url: entry.url,
+          hasBeenRead: !entry.hasBeenRead
+        });
+        loadReadingList();
+      } catch (err) {
+        console.error('Failed to update reading list entry', err);
+      }
+    });
+
+    el.querySelector('.remove-entry').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await chrome.readingList.removeEntry({ url: entry.url });
+        loadReadingList();
+      } catch (err) {
+        console.error('Failed to remove reading list entry', err);
+      }
+    });
+
+    container.appendChild(el);
+  });
+}
+
+// 検索
+document.getElementById('reading-list-search').addEventListener('input', (e) => {
+  clearTimeout(readingListSearchTimeout);
+  readingListQuery = e.target.value.trim();
+  readingListSearchTimeout = setTimeout(() => {
+    loadReadingList();
+  }, 200);
+});
+
+// リーディングリスト更新の監視
+if (chrome.readingList) {
+  const onRLChange = () => {
+    if (document.getElementById('panel-readingList').classList.contains('active')) {
+      loadReadingList();
+    }
+  };
+  chrome.readingList.onEntryAdded?.addListener(onRLChange);
+  chrome.readingList.onEntryRemoved?.addListener(onRLChange);
+  chrome.readingList.onEntryUpdated?.addListener(onRLChange);
+}
 
 // ===== バックグラウンドからのメッセージ受信 =====
 chrome.runtime.onMessage.addListener((message) => {
@@ -1824,7 +2841,26 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // ===== 初期化 =====
 async function init() {
+  loadUserSettings();
+  loadTabConfig();
+  renderNavTabs();
+  renderSettingsPanel();
   await loadTabs();
 }
 
 init().catch(console.error);
+
+
+// ===== i18n Localization =====
+function localizeHtmlPage() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.innerHTML = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
+  });
+}
+document.addEventListener('DOMContentLoaded', localizeHtmlPage);
