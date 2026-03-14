@@ -39,12 +39,41 @@ const state = {
     historyRecentlyClosed: false,
     bookmarkVisitCount: false,
     themeColor: 'blue',
-    colorScheme: 'auto'
+    colorScheme: 'auto',
+    shortcuts: {
+      'new-tab': 'Alt+N',
+      'toggle-pinned': 'Alt+P',
+      'display-mode': 'Alt+D',
+      'sort-mode': 'Alt+S',
+      'collapse-all': 'Alt+Up',
+      'expand-all': 'Alt+Down',
+      'focus-search': '/',
+      'switch-tabs': 'Alt+1',
+      'switch-history': 'Alt+2',
+      'switch-bookmarks': 'Alt+3',
+      'switch-settings': 'Alt+4'
+    }
   },
+  isRecordingShortcut: false,
 
   // タブ管理・設定
   tabConfig: []
 };
+
+// ショートカット定義
+const SHORTCUT_ACTIONS = [
+  { id: 'switch-tabs', label: chrome.i18n.getMessage('actionSwitchTabs') },
+  { id: 'switch-history', label: chrome.i18n.getMessage('actionSwitchHistory') },
+  { id: 'switch-bookmarks', label: chrome.i18n.getMessage('actionSwitchBookmarks') },
+  { id: 'switch-settings', label: chrome.i18n.getMessage('actionSwitchSettings') },
+  { id: 'new-tab', label: chrome.i18n.getMessage('actionNewTab') },
+  { id: 'focus-search', label: chrome.i18n.getMessage('actionFocusSearch') },
+  { id: 'toggle-pinned', label: chrome.i18n.getMessage('actionTogglePinned') },
+  { id: 'display-mode', label: chrome.i18n.getMessage('actionDisplayMode') },
+  { id: 'sort-mode', label: chrome.i18n.getMessage('actionSortMode') },
+  { id: 'collapse-all', label: chrome.i18n.getMessage('actionCollapseAll') },
+  { id: 'expand-all', label: chrome.i18n.getMessage('actionExpandAll') }
+];
 
 // デフォルトのタブ設定
 const DEFAULT_TAB_CONFIG = [
@@ -238,6 +267,76 @@ document.getElementById('btn-sort-mode').addEventListener('click', () => {
   renderTabTree();
 });
 
+// ===== ショートカット管理 =====
+function getShortcutString(e) {
+  const parts = [];
+  if (e.ctrlKey) parts.push('Ctrl');
+  if (e.shiftKey) parts.push('Shift');
+  if (e.altKey) parts.push('Alt');
+  if (e.metaKey) parts.push('Cmd');
+
+  // メインキー（修飾キー単体の場合は含めない）
+  if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+    let key = e.key;
+    if (key === ' ') key = 'Space';
+    if (key === 'ArrowUp') key = 'Up';
+    if (key === 'ArrowDown') key = 'Down';
+    if (key === 'ArrowLeft') key = 'Left';
+    if (key === 'ArrowRight') key = 'Right';
+
+    // 1文字の場合は大文字、それ以外はそのまま
+    parts.push(key.length === 1 ? key.toUpperCase() : key);
+  } else if (parts.length === 0) {
+    // 修飾キーのみの場合は無効な文字列を返す（録画中は別）
+    return '';
+  }
+
+  return parts.join('+');
+}
+
+function handleShortcutAction(actionId) {
+  switch (actionId) {
+    case 'switch-tabs':
+      document.querySelector('[data-panel="tabs"]')?.click();
+      break;
+    case 'switch-history':
+      document.querySelector('[data-panel="history"]')?.click();
+      break;
+    case 'switch-bookmarks':
+      document.querySelector('[data-panel="bookmarks"]')?.click();
+      break;
+    case 'switch-settings':
+      document.querySelector('[data-panel="settings"]')?.click();
+      break;
+    case 'new-tab':
+      document.getElementById('btn-new-tab')?.click();
+      break;
+    case 'focus-search':
+      const activePanel = document.querySelector('.panel.active');
+      const searchInput = activePanel?.querySelector('input[type="text"]');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+      break;
+    case 'toggle-pinned':
+      document.getElementById('btn-toggle-pinned')?.click();
+      break;
+    case 'display-mode':
+      document.getElementById('btn-display-mode')?.click();
+      break;
+    case 'sort-mode':
+      document.getElementById('btn-sort-mode')?.click();
+      break;
+    case 'collapse-all':
+      document.getElementById('btn-collapse-all')?.click();
+      break;
+    case 'expand-all':
+      document.getElementById('btn-expand-all')?.click();
+      break;
+  }
+}
+
 // ===== ユーティリティ =====
 function sendMessage(type, data = {}) {
   return new Promise((resolve, reject) => {
@@ -317,7 +416,12 @@ function loadUserSettings() {
   try {
     const saved = localStorage.getItem('ttm-user-settings');
     if (saved) {
-      state.userSettings = { ...state.userSettings, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      state.userSettings = {
+        ...state.userSettings,
+        ...parsed,
+        shortcuts: { ...state.userSettings.shortcuts, ...(parsed.shortcuts || {}) }
+      };
     }
   } catch (e) { }
   applyColorScheme();
@@ -578,6 +682,103 @@ function renderSettingsPanel() {
       applyDisplayMode(e.target.value);
     };
   }
+
+  renderShortcutsSettings();
+}
+
+function renderShortcutsSettings() {
+  const container = document.getElementById('shortcuts-settings-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  SHORTCUT_ACTIONS.forEach(action => {
+    const item = document.createElement('div');
+    item.className = 'settings-item-normal';
+
+    const label = document.createElement('div');
+    label.className = 'settings-item-label';
+    label.textContent = action.label;
+
+    const right = document.createElement('div');
+    right.style.display = 'flex';
+    right.style.gap = '8px';
+    right.style.alignItems = 'center';
+
+    const kbd = document.createElement('button');
+    kbd.className = 'shortcut-kbd-btn';
+    kbd.textContent = state.userSettings.shortcuts[action.id] || '---';
+
+    kbd.onclick = () => {
+      if (state.isRecordingShortcut) return;
+      state.isRecordingShortcut = true;
+      kbd.classList.add('recording');
+      kbd.textContent = chrome.i18n.getMessage('shortcutRecordPrompt');
+
+      const onKeyDown = (e) => {
+        // Alt, Ctrl, Shift, Meta 自体は無視して継続
+        if (['Alt', 'Control', 'Shift', 'Meta'].includes(e.key)) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Escapeでキャンセル
+        if (e.key === 'Escape') {
+          stopRecording();
+          return;
+        }
+
+        const shortcut = getShortcutString(e);
+        if (shortcut) {
+          state.userSettings.shortcuts[action.id] = shortcut;
+          saveUserSettings();
+          stopRecording();
+        }
+      };
+
+      const stopRecording = () => {
+        state.isRecordingShortcut = false;
+        kbd.classList.remove('recording');
+        kbd.textContent = state.userSettings.shortcuts[action.id] || '---';
+        window.removeEventListener('keydown', onKeyDown, true);
+        renderShortcutsSettings();
+      };
+
+      window.addEventListener('keydown', onKeyDown, true);
+    };
+
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'toolbar-btn';
+    resetBtn.title = chrome.i18n.getMessage('shortcutReset');
+    resetBtn.style.padding = '4px';
+    resetBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>`;
+    resetBtn.onclick = () => {
+      // デフォルトに戻す
+      const defaults = {
+        'new-tab': 'Alt+N',
+        'toggle-pinned': 'Alt+P',
+        'display-mode': 'Alt+D',
+        'sort-mode': 'Alt+S',
+        'collapse-all': 'Alt+Up',
+        'expand-all': 'Alt+Down',
+        'focus-search': '/',
+        'switch-tabs': 'Alt+1',
+        'switch-history': 'Alt+2',
+        'switch-bookmarks': 'Alt+3',
+        'switch-settings': 'Alt+4'
+      };
+      state.userSettings.shortcuts[action.id] = defaults[action.id] || '';
+      saveUserSettings();
+      renderShortcutsSettings();
+    };
+
+    right.appendChild(kbd);
+    right.appendChild(resetBtn);
+    item.appendChild(label);
+    item.appendChild(right);
+    container.appendChild(item);
+  });
 }
 
 // ===== モーダル管理 =====
@@ -670,11 +871,33 @@ function hideContextMenu() {
 
 document.addEventListener('click', hideContextMenu);
 document.addEventListener('keydown', (e) => {
+  // ショートカット録画中は何もしない
+  if (state.isRecordingShortcut) return;
+
   if (e.key === 'Escape') {
     hideContextMenu();
     if (state.selectingParentFor != null) {
       cancelParentSelection();
       showToast('キャンセルしました');
+    }
+    return;
+  }
+
+  // 入力フィールドフォーカス時はスキップ（ただし検索フォーカスショートカットは除く）
+  const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+  const shortcut = getShortcutString(e);
+
+  if (!shortcut) return;
+
+  // ショートカット判定
+  for (const [actionId, key] of Object.entries(state.userSettings.shortcuts || {})) {
+    if (key === shortcut) {
+      // 検索へのフォーカス以外は入力中は無視
+      if (isInput && actionId !== 'focus-search') continue;
+
+      e.preventDefault();
+      handleShortcutAction(actionId);
+      break;
     }
   }
 });

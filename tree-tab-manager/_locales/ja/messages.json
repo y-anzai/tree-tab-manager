@@ -5,6 +5,9 @@
   "extDesc": {
     "message": "タブをツリー形式で管理するサイドバー拡張機能"
   },
+  "shortcutToggle": {
+    "message": "Tree Tab Manager を表示"
+  },
   "navTabs": {
     "message": "タブ"
   },
@@ -425,5 +428,47 @@
   },
   "historyListHeader": {
     "message": "すべての履歴"
+  },
+  "settingsShortcutsTitle": {
+    "message": "ショートカットキー設定"
+  },
+  "shortcutRecordPrompt": {
+    "message": "キーを入力してください..."
+  },
+  "shortcutReset": {
+    "message": "リセット"
+  },
+  "actionNewTab": {
+    "message": "新しいタブ"
+  },
+  "actionTogglePinned": {
+    "message": "固定タブの表示切替"
+  },
+  "actionDisplayMode": {
+    "message": "表示モード切替"
+  },
+  "actionSortMode": {
+    "message": "ソートモード切替"
+  },
+  "actionCollapseAll": {
+    "message": "すべて折りたたむ"
+  },
+  "actionExpandAll": {
+    "message": "すべて展開"
+  },
+  "actionFocusSearch": {
+    "message": "検索にフォーカス"
+  },
+  "actionSwitchTabs": {
+    "message": "「タブ」パネルへ"
+  },
+  "actionSwitchHistory": {
+    "message": "「履歴」パネルへ"
+  },
+  "actionSwitchBookmarks": {
+    "message": "「お気に入り」パネルへ"
+  },
+  "actionSwitchSettings": {
+    "message": "「設定」パネルへ"
   }
 }

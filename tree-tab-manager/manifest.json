@@ -15,6 +15,15 @@
     "sessions",
     "sidePanel"
   ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "__MSG_shortcutToggle__"
+    }
+  },
   "side_panel": {
     "default_path": "sidepanel/index.html"
   },

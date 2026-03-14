@@ -5,6 +5,9 @@
     "extDesc": {
         "message": "Sidebar extension for managing tabs in a tree structure"
     },
+    "shortcutToggle": {
+        "message": "Display Tree Tab Manager"
+    },
     "navTabs": {
         "message": "Tabs"
     },
@@ -425,5 +428,47 @@
     },
     "historyListHeader": {
         "message": "All History"
+    },
+    "settingsShortcutsTitle": {
+        "message": "Shortcut Settings"
+    },
+    "shortcutRecordPrompt": {
+        "message": "Press keys..."
+    },
+    "shortcutReset": {
+        "message": "Reset"
+    },
+    "actionNewTab": {
+        "message": "New Tab"
+    },
+    "actionTogglePinned": {
+        "message": "Toggle Pinned Tabs"
+    },
+    "actionDisplayMode": {
+        "message": "Switch Display Mode"
+    },
+    "actionSortMode": {
+        "message": "Switch Sort Mode"
+    },
+    "actionCollapseAll": {
+        "message": "Collapse All"
+    },
+    "actionExpandAll": {
+        "message": "Expand All"
+    },
+    "actionFocusSearch": {
+        "message": "Focus Search"
+    },
+    "actionSwitchTabs": {
+        "message": "Switch to Tabs"
+    },
+    "actionSwitchHistory": {
+        "message": "Switch to History"
+    },
+    "actionSwitchBookmarks": {
+        "message": "Switch to Bookmarks"
+    },
+    "actionSwitchSettings": {
+        "message": "Switch to Settings"
     }
 }
