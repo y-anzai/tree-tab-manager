@@ -1291,47 +1291,62 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     ? `<span class="tab-group-dot-sm group-dot-${tabGroupInfo.color}" title="${escapeHtml(tabGroupInfo.title || 'グループ')}"></span>`
     : '';
 
+  const childIconHtml = depth > 0
+    ? `<div class="tab-child-connector"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2v7a2 2 0 002 2h6v-2.5l3.5 3.5-3.5 3.5v-2.5h-6a4 4 0 01-4-4v-7h2z"/></svg></div>`
+    : '';
+
+  item.style.marginLeft = `${indentPx}px`;
+
   item.innerHTML = `
-    <div class="tab-indent" style="width:${indentPx}px"></div>
+    ${childIconHtml}
+    <div class="tab-drag-handle">
+      <svg viewBox="0 0 10 10" fill="currentColor">
+        <circle cx="3" cy="3" r="1"/><circle cx="7" cy="3" r="1"/>
+        <circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/>
+        <circle cx="3" cy="7" r="1"/><circle cx="7" cy="7" r="1"/>
+      </svg>
+    </div>
     <div class="tab-toggle ${hasChildren ? (isCollapsed ? 'collapsed' : '') : 'no-children'}">
       <svg viewBox="0 0 10 10" fill="currentColor">
         <path d="M2 3l3 4 3-4H2z"/>
       </svg>
     </div>
-    ${groupDotHtml}
-    ${faviconUrl
+    <div class="tab-content-wrapper">
+      ${groupDotHtml}
+      ${faviconUrl
       ? `<img class="tab-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="">`
       : ''
     }
-    ${!faviconUrl ? getDefaultFavicon() : `<span class="tab-favicon-default" style="display:none">${getDefaultFavicon()}</span>`}
-    ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>' : ''}
-    <div class="tab-info">
-      <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
-      ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
-    </div>
-    ${hasChildren ? (() => {
+      ${!faviconUrl ? getDefaultFavicon() : `<span class="tab-favicon-default" style="display:none">${getDefaultFavicon()}</span>`}
+      ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>' : ''}
+      <div class="tab-info">
+        <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
+        ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
+      </div>
+      ${hasChildren ? (() => {
       const total = countDescendants(tab);
       return `<span class="desc-badge" title="${total}件の子孫タブ">${total}</span>`;
     })() : ''}
-    <div class="tab-actions">
-      ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="固定">
-        <svg viewBox="0 0 20 20" fill="currentColor">
-          <path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/>
-        </svg>
-      </button>` : ''}
-      ${hasChildren ? (() => {
+      <div class="tab-actions">
+        ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="固定">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/>
+          </svg>
+        </button>` : ''}
+        ${hasChildren ? (() => {
       const total = countDescendants(tab);
       return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="このタブと子タブをすべて閉じる（${total + 1}個）">
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
-          </svg>
-        </button>`;
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+              </svg>
+            </button>`;
     })() : ''}
-      <button class="tab-action-btn close-btn" data-action="close" title="閉じる">
-        <svg viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-        </svg>
-      </button>
+        <button class="tab-action-btn close-btn" data-action="close" title="閉じる">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+      </div>
     </div>
   `;
 

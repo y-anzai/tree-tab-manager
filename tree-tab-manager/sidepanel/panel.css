@@ -257,12 +257,24 @@ body.mode-mini .header-title-text {
   margin: 1px 4px;
 }
 
-.tab-item:hover {
+.tab-item:hover .tab-content-wrapper {
   background: var(--bg-hover);
 }
 
-.tab-item.active-tab {
+.tab-item.active-tab .tab-content-wrapper {
   background: var(--bg-active);
+}
+
+.tab-content-wrapper {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  height: min-content;
+  min-height: 28px;
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  margin-left: 2px;
+  transition: background var(--transition);
 }
 
 .tab-item.active-tab::before {
@@ -277,7 +289,62 @@ body.mode-mini .header-title-text {
 }
 
 .tab-item.pinned-tab {
-  background: rgba(203, 166, 247, 0.08);
+  background: color-mix(in srgb, var(--accent-purple) 8%, var(--bg-primary));
+  border: 1px solid color-mix(in srgb, var(--accent-purple) 15%, transparent);
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.tab-item.pinned-tab .tab-title {
+  color: var(--accent-purple);
+  font-weight: 500;
+}
+
+/* 子タブのコネクタアイコン */
+.tab-child-connector {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin-left: -16px;
+  margin-right: 2px;
+}
+
+.tab-child-connector svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* ドラッグハンドル */
+.tab-drag-handle {
+  width: 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity var(--transition);
+  margin-right: 2px;
+}
+
+.tab-item:hover .tab-drag-handle {
+  opacity: 0.5;
+}
+
+.tab-drag-handle:hover {
+  opacity: 1 !important;
+  color: var(--theme-color);
+}
+
+.tab-drag-handle svg {
+  width: 8px;
+  height: 12px;
 }
 
 /* インデント用スペーサー */

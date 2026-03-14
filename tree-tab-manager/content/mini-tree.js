@@ -223,13 +223,27 @@ function renderNode(node, depth, isLast = false, parentIsLast = []) {
       <svg viewBox="0 0 10 10" fill="currentColor"><path d="M2 3l3 4 3-4H2z"/></svg>
     </div>`;
 
+  // ドラッグハンドル
+  html += `<div class="ttm-mt-drag-handle">
+      <svg viewBox="0 0 10 10" fill="currentColor">
+        <circle cx="3" cy="3" r="1"/><circle cx="7" cy="3" r="1"/>
+        <circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/>
+        <circle cx="3" cy="7" r="1"/><circle cx="7" cy="7" r="1"/>
+      </svg>
+    </div>`;
+
+  // コンテンツラッパー
+  html += `<div class="ttm-mt-content">`;
+
   // アイコン
   html += `<div class="ttm-mt-icon-box">
-      ${favicon ? `<img class="ttm-mt-favicon" src="${escHtml(favicon)}" onerror="this.style.display='none'" alt="">` : '<span class="ttm-mt-no-favicon"></span>'}
-    </div>`;
+        ${favicon ? `<img class="ttm-mt-favicon" src="${escHtml(favicon)}" onerror="this.style.display='none'" alt="">` : '<span class="ttm-mt-no-favicon"></span>'}
+      </div>`;
 
   // タイトル
   html += `<span class="ttm-mt-title" title="${escHtml(node.title)}">${escHtml(node.title || '(無題)')}</span>`;
+
+  html += `</div>`; // .ttm-mt-content 終了
 
   html += `</div>`; // .ttm-mt-item 終了
 
@@ -415,9 +429,10 @@ const PANEL_CSS = `
   #ttm-mt-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 3px 0; }
   #ttm-mt-tree::-webkit-scrollbar { width: 0px; }
   
-  .ttm-mt-item { position: relative; border-radius: 4px; margin: 1px 4px; display: flex; align-items: center; height: 28px; cursor: pointer; transition: background 100ms; box-sizing: border-box; overflow: hidden; padding-left: 4px; }
-  .ttm-mt-item:hover { background: rgba(58,58,80,0.9); }
-  .ttm-mt-item.ttm-mt-active { background: rgba(74,74,101,0.9); }
+  .ttm-mt-item { position: relative; border-radius: 4px; margin: 1px 4px; display: flex; align-items: center; height: 28px; cursor: pointer; box-sizing: border-box; overflow: hidden; padding-left: 4px; }
+  .ttm-mt-content { display: flex; align-items: center; flex: 1; height: 24px; border-radius: 4px; padding: 0 4px; transition: background 100ms; overflow: hidden; }
+  .ttm-mt-item:hover .ttm-mt-content { background: rgba(58,58,80,0.9); }
+  .ttm-mt-item.ttm-mt-active .ttm-mt-content { background: rgba(74,74,101,0.9); }
   .ttm-mt-item.ttm-mt-active::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; background: #89b4fa; border-radius: 1px; }
 
   /* ドラッグ＆ドロップ用スタイル */
@@ -442,6 +457,11 @@ const PANEL_CSS = `
   .ttm-mt-toggle svg { width: 8px; height: 8px; transition: transform 0.1s; }
   .ttm-mt-toggle.ttm-mt-collapsed svg { transform: rotate(-90deg); }
   .ttm-mt-toggle.ttm-mt-no-children { visibility: hidden; }
+  
+  .ttm-mt-drag-handle { width: 12px; height: 16px; display: flex; align-items: center; justify-content: center; color: #6c7086; cursor: grab; opacity: 0; transition: opacity 100ms; flex-shrink: 0; }
+  .ttm-mt-item:hover .ttm-mt-drag-handle { opacity: 0.6; }
+  .ttm-mt-drag-handle:hover { color: #89b4fa; opacity: 1 !important; }
+  .ttm-mt-drag-handle svg { width: 8px; height: 12px; }
 
   .ttm-mt-icon-box { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-right: 4px; }
   .ttm-mt-favicon { width: 14px; height: 14px; object-fit: contain; }
