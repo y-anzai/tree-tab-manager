@@ -49,6 +49,13 @@
   <div id="panel-tabs" class="panel active">
     <!-- ツールバー -->
     <div class="toolbar">
+      <button class="toolbar-btn" id="btn-display-mode" title="表示モード切替" data-i18n-title="displayMode">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z"
+            clip-rule="evenodd" />
+        </svg>
+      </button>
       <button class="toolbar-btn" id="btn-new-tab" title="新しいタブ" data-i18n-title="toolbarNewTab">
         <svg viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd"
@@ -66,26 +73,10 @@
               clip-rule="evenodd" />
           </svg>
         </button>
-        <button class="toolbar-btn" id="btn-display-mode" title="表示モード切替" data-i18n-title="displayMode">
-          <!-- JS で動的に差し替える -->
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-              d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z"
-              clip-rule="evenodd" />
-          </svg>
-        </button>
-        <button class="toolbar-btn" id="btn-save-session" title="セッションを保存" data-i18n-title="toolbarSaveSession">
+        <button class="toolbar-btn" id="btn-sessions" title="セッション管理" data-i18n-title="toolbarSessions">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path
-              d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
-          </svg>
-        </button>
-        <button class="toolbar-btn" id="btn-load-session" title="セッションを呼び出し" data-i18n-title="toolbarLoadSession">
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
-            <path fill-rule="evenodd"
-              d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
-              clip-rule="evenodd" />
+              d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
           </svg>
         </button>
         <button class="toolbar-btn" id="btn-sort-mode" title="並び順: ツリー" data-i18n-title="sortTree">
@@ -95,17 +86,10 @@
               clip-rule="evenodd" />
           </svg>
         </button>
-        <button class="toolbar-btn" id="btn-collapse-all" title="すべて折りたたむ" data-i18n-title="toolbarCollapseAll">
-          <svg viewBox="0 0 20 20" fill="currentColor">
+        <button class="toolbar-btn" id="btn-toggle-all" title="すべて展開/折りたたむ" data-i18n-title="toolbarToggleAll">
+          <svg viewBox="0 0 20 20" fill="currentColor" class="toggle-all-icon">
             <path fill-rule="evenodd"
               d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-              clip-rule="evenodd" />
-          </svg>
-        </button>
-        <button class="toolbar-btn" id="btn-expand-all" title="すべて展開" data-i18n-title="toolbarExpandAll">
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-              d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
               clip-rule="evenodd" />
           </svg>
         </button>
@@ -256,6 +240,25 @@
             <span id="mini-tree-width-value" style="font-size: 12px; color: var(--text); min-width: 35px;">90px</span>
           </div>
         </label>
+
+        <label class="settings-item-normal">
+          <div class="settings-item-label" data-i18n="settingsFocusEffect">フォーカス効果の強度</div>
+          <select id="setting-focus-intensity" class="settings-select">
+            <option value="none" data-i18n="focusNone">なし</option>
+            <option value="low" data-i18n="focusLow">控えめ</option>
+            <option value="medium" data-i18n="focusMedium">標準</option>
+            <option value="high" data-i18n="focusHigh">強力</option>
+          </select>
+        </label>
+
+        <label class="settings-item-normal">
+          <div class="settings-item-label" data-i18n="settingsToggleSize">開閉ボタンの大きさ</div>
+          <select id="setting-toggle-size" class="settings-select">
+            <option value="small" data-i18n="sizeSmall">小</option>
+            <option value="medium" data-i18n="sizeMedium">中</option>
+            <option value="large" data-i18n="sizeLarge">大</option>
+          </select>
+        </label>
       </div>
 
       <hr class="settings-divider">
@@ -266,35 +269,32 @@
     </div>
   </div>
 
-  <!-- セッション保存モーダル -->
-  <div id="modal-save-session" class="modal hidden">
+  <!-- セッション管理モーダル -->
+  <div id="modal-sessions" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 data-i18n="modalSaveSessionTitle">セッションを保存</h3>
-        <button class="modal-close" data-modal="modal-save-session">&times;</button>
+        <h3 data-i18n="modalSessionsTitle">セッション管理</h3>
+        <button class="modal-close" data-modal="modal-sessions">&times;</button>
       </div>
       <div class="modal-body">
-        <label for="session-name-input" data-i18n="sessionNamePlaceholder">セッション名</label>
-        <input type="text" id="session-name-input" placeholder="セッション名を入力..."
-          data-i18n-placeholder="sessionNamePlaceholder" class="modal-input">
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" data-modal="modal-save-session" data-i18n="btnCancel">キャンセル</button>
-        <button class="btn-primary" id="btn-confirm-save" data-i18n="btnSave">保存</button>
-      </div>
-    </div>
-  </div>
+        <!-- 保存セクション -->
+        <div class="modal-section">
+          <h4 class="modal-section-title" data-i18n="modalSaveSessionTitle">現在のセッションを保存</h4>
+          <div class="save-session-form">
+            <input type="text" id="session-name-input" placeholder="セッション名を入力..."
+              data-i18n-placeholder="sessionNamePlaceholder" class="modal-input">
+            <button class="btn-primary" id="btn-confirm-save" data-i18n="btnSave">保存</button>
+          </div>
+        </div>
 
-  <!-- セッション呼び出しモーダル -->
-  <div id="modal-load-session" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 data-i18n="modalLoadSessionTitle">セッションを呼び出し</h3>
-        <button class="modal-close" data-modal="modal-load-session">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div id="session-list" class="session-list">
-          <div class="loading" data-i18n="msgLoading">読み込み中...</div>
+        <hr class="modal-divider">
+
+        <!-- 呼び出しセクション -->
+        <div class="modal-section">
+          <h4 class="modal-section-title" data-i18n="modalLoadSessionTitle">保存済みのセッションを呼び出し</h4>
+          <div id="session-list" class="session-list">
+            <div class="loading" data-i18n="msgLoading">読み込み中...</div>
+          </div>
         </div>
       </div>
     </div>

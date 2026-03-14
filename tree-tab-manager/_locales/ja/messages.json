@@ -497,5 +497,32 @@
   },
   "settingsMiniTreeWidth": {
     "message": "ミニツリーの幅"
+  },
+  "settingsFocusEffect": {
+    "message": "フォーカス効果 (非アクティブ時に背景を暗くする)"
+  },
+  "focusNone": {
+    "message": "なし"
+  },
+  "focusLow": {
+    "message": "控えめ"
+  },
+  "focusMedium": {
+    "message": "標準"
+  },
+  "focusHigh": {
+    "message": "強力"
+  },
+  "settingsToggleSize": {
+    "message": "親ツリー開閉アイコンの大きさ"
+  },
+  "sizeSmall": {
+    "message": "小"
+  },
+  "sizeMedium": {
+    "message": "中"
+  },
+  "sizeLarge": {
+    "message": "大"
   }
 }

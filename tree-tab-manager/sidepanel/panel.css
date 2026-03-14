@@ -261,13 +261,124 @@ body.mode-mini .header-title-text {
   /* 万が一の溢れを防止 */
 }
 
-.tab-item:hover .tab-content-wrapper {
+.toggle-all-icon {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-all-icon.expanded {
+  transform: rotate(180deg);
+}
+
+
+.tab-item:hover .tab-content-wrapper,
+.tab-item.active-tab .tab-content-wrapper {
   background: var(--bg-hover);
 }
 
-.tab-item.active-tab .tab-content-wrapper {
+.tab-item.active-tab .tab-title {
+  color: var(--theme-color);
+  font-weight: 600;
+}
+
+/* 非アクティブ（ブラー）時のフォーカス表示 */
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-item:not(.active-tab),
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-item.active-tab .tab-url,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-item.active-tab .tab-actions,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-item.active-tab .desc-badge,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .header,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-nav,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .toolbar,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-drag-handle,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-toggle,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-child-connector {
+  opacity: 0.6;
+}
+
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-item:not(.active-tab),
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-item.active-tab .tab-url,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-item.active-tab .tab-actions,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-item.active-tab .desc-badge,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .header,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-nav,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .toolbar,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-drag-handle,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-toggle,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-child-connector {
+  opacity: 0.25;
+}
+
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-item:not(.active-tab),
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-item.active-tab .tab-url,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-item.active-tab .tab-actions,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-item.active-tab .desc-badge,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .header,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-nav,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .toolbar,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-drag-handle,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-toggle,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-child-connector {
+  opacity: 0.05;
+}
+
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-content-wrapper {
+  background: transparent;
+}
+
+body[data-focus-intensity="none"]:not(.sidepanel-focused) .tab-item.active-tab .tab-content-wrapper {
+  background: var(--bg-hover);
+}
+
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-title,
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-favicon,
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-favicon-default,
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-pin-icon {
+  opacity: 1;
+}
+
+
+/* ツールバーのピル型グループ */
+.toolbar-pill {
+  display: flex;
+  align-items: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  margin-right: 4px;
+}
+
+.pill-btn {
+  width: 26px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+  padding: 0;
+}
+
+.pill-btn:hover {
+  color: var(--text-primary);
   background: var(--bg-active);
 }
+
+.pill-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pill-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
 
 .tab-content-wrapper {
   display: flex;
@@ -382,6 +493,17 @@ body.mode-mini .header-title-text {
   transition: transform var(--transition);
 }
 
+body[data-toggle-size="small"] .tab-toggle svg {
+  width: 8px;
+  height: 8px;
+}
+
+body[data-toggle-size="large"] .tab-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+
 .tab-toggle.collapsed svg {
   transform: rotate(-90deg);
 }
@@ -436,6 +558,13 @@ body.mode-mini .header-title-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tab-relative-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 8px;
+  flex-shrink: 0;
 }
 
 /* ピンアイコン */
@@ -2019,6 +2148,43 @@ body.mode-mini .pinned-count-label {
 .color-swatch-custom {
   background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
   font-size: 14px;
+}
+
+/* セッション管理モーダルのセクション */
+.modal-section {
+  padding: 8px 0;
+}
+
+.modal-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.save-session-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.save-session-form .modal-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.modal-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.session-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
 }
 
 .settings-select {

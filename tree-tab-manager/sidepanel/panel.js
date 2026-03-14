@@ -11,6 +11,8 @@ const state = {
   currentWindowId: null,
   showPinnedTabs: true,  // 固定タブセクションの表示状態
   tabActivationTime: {},  // tabId -> lastActivationTime（最近開いた順用）
+  lastSortMode: null,     // 前回のソートモードを記憶
+
   tabGroupMap: {},        // tabId -> groupId（グループ認識用）
   tabGroupInfo: {},       // groupId -> { id, title, color, collapsed }
   tabGroupCollapseState: {}, // groupId -> collapsed (ローカルサイドバー状態)
@@ -42,6 +44,8 @@ const state = {
     colorScheme: 'auto',
     sidePanelSide: 'right',
     miniTreeWidth: 90,
+    focusIntensity: 'medium', // 'none', 'low', 'medium', 'high'
+    toggleSize: 'medium',
     shortcuts: {
       'new-tab': 'Alt+N',
       'toggle-pinned': 'Alt+P',
@@ -220,6 +224,11 @@ function applyColorScheme() {
   if (state.userSettings.themeColor) {
     applyThemeColor(state.userSettings.themeColor);
   }
+}
+
+function applyToggleSize() {
+  const size = state.userSettings.toggleSize || 'medium';
+  document.body.setAttribute('data-toggle-size', size);
 }
 
 // 初期化時に外観モードを適用
@@ -443,6 +452,9 @@ function loadUserSettings() {
         ...parsed,
         shortcuts: { ...state.userSettings.shortcuts, ...(parsed.shortcuts || {}) }
       };
+      // 旧設定からの移行: focusEffect (boolean) があれば focusIntensity に変換
+      if (parsed.focusEffect === false) state.userSettings.focusIntensity = 'none';
+      if (parsed.focusEffect === true && !parsed.focusIntensity) state.userSettings.focusIntensity = 'medium';
     }
   } catch (e) { }
   applyColorScheme();
@@ -742,6 +754,27 @@ function renderSettingsPanel() {
     };
   }
 
+  const selFocusIntensity = document.getElementById('setting-focus-intensity');
+  if (selFocusIntensity) {
+    selFocusIntensity.value = state.userSettings.focusIntensity || 'medium';
+    selFocusIntensity.onchange = (e) => {
+      state.userSettings.focusIntensity = e.target.value;
+      saveUserSettings();
+      applyFocusIntensity();
+      updateFocusState();
+    };
+  }
+
+  const selToggleSize = document.getElementById('setting-toggle-size');
+  if (selToggleSize) {
+    selToggleSize.value = state.userSettings.toggleSize || 'medium';
+    selToggleSize.onchange = (e) => {
+      state.userSettings.toggleSize = e.target.value;
+      saveUserSettings();
+      applyToggleSize();
+    };
+  }
+
   renderShortcutsSettings();
 }
 
@@ -977,6 +1010,18 @@ function getBranchIds(tab) {
   });
   return ids;
 }
+function getRelativeTimeString(ms) {
+  if (!ms) return '';
+  const diff = Date.now() - ms;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}h`;
+  const day = Math.floor(hour / 24);
+  return `${day}d`;
+}
 
 // ツリー構造を構築
 function buildTabTree(tabs, parents) {
@@ -1194,13 +1239,26 @@ function renderTabTree() {
   const pinnedCountEl = document.getElementById('pinned-count-label');
   if (pinnedCountEl) pinnedCountEl.textContent = String(pinnedTotal);
 
-  // 固定タブトグルボタンのスタイル更新
-  const togglePinnedBtn = document.getElementById('btn-toggle-pinned');
-  if (togglePinnedBtn) {
-    togglePinnedBtn.classList.toggle('pinned-hidden', !state.showPinnedTabs);
-    togglePinnedBtn.title = state.showPinnedTabs
-      ? `固定タブを非表示 (${pinnedTotal}件)`
-      : `固定タブを表示 (${pinnedTotal}件)`;
+  // すべて展開/折りたたみボタンのアイコン状態を更新
+  const toggleAllBtn = document.getElementById('btn-toggle-all');
+  if (toggleAllBtn) {
+    const icon = toggleAllBtn.querySelector('.toggle-all-icon');
+    if (icon) {
+      // いずれかの親タブが展開されていたら「折りたたみ可能」状態
+      const anyExpanded = state.tabs.some(tab => {
+        const hasChildren = state.tabs.some(t => state.tabParents[t.id] === tab.id);
+        return hasChildren && !state.collapseState[tab.id];
+      });
+      icon.classList.toggle('expanded', !anyExpanded);
+      toggleAllBtn.title = anyExpanded ? 'すべて折りたたむ' : 'すべて展開';
+    }
+  }
+
+  // ソートモードが最近開いた順ならタイマー開始、そうでなければ停止
+  if (state.tabSortMode === 'recent') {
+    startRecentTimeUpdateTimer();
+  } else {
+    stopRecentTimeUpdateTimer();
   }
 
   container.innerHTML = '';
@@ -1336,6 +1394,11 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
         <circle cx="3" cy="7" r="1"/><circle cx="7" cy="7" r="1"/>
       </svg>
     </div>
+    <div class="tab-toggle ${hasChildren ? (isCollapsed ? 'collapsed' : '') : 'no-children'}">
+      <svg viewBox="0 0 10 10" fill="currentColor">
+        <path d="M2 3l3 4 3-4H2z"/>
+      </svg>
+    </div>
     <div class="tab-content-wrapper">
       ${groupDotHtml}
       ${faviconUrl
@@ -1348,6 +1411,7 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
         <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
         ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
       </div>
+      ${(state.tabSortMode === 'recent' && !tab.pinned) ? `<span class="tab-relative-time">${getRelativeTimeString(state.tabActivationTime[tab.id])}</span>` : ''}
       <div class="tab-actions">
         ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="固定">
           <svg viewBox="0 0 20 20" fill="currentColor">
@@ -1397,6 +1461,15 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
 
     activateTab(tab.id, tab.windowId);
   });
+
+  // 折りたたみトグル
+  const toggle = item.querySelector('.tab-toggle');
+  if (toggle && hasChildren) {
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleTabCollapse(tab.id);
+    });
+  }
 
   // 折りたたみトグル（件数バッジをクリック）
   const badgeToggle = item.querySelector('.desc-badge.clickable-toggle');
@@ -1849,9 +1922,21 @@ function toggleTabCollapse(tabId) {
   if (childrenEl) {
     childrenEl.classList.toggle('collapsed', isCollapsed);
   }
-
   // バックグラウンドに通知
   sendMessage('SET_TAB_COLLAPSED', { tabId, collapsed: isCollapsed });
+}
+
+function toggleAllCollapse() {
+  const anyExpanded = state.tabs.some(tab => {
+    const hasChildren = state.tabs.some(t => state.tabParents[t.id] === tab.id);
+    return hasChildren && !state.collapseState[tab.id];
+  });
+
+  if (anyExpanded) {
+    collapseAll();
+  } else {
+    expandAll();
+  }
 }
 
 function collapseAll() {
@@ -2101,16 +2186,15 @@ async function refreshTabTree() {
 document.getElementById('btn-new-tab').addEventListener('click', () => {
   sendMessage('NEW_TAB', {});
 });
-
-document.getElementById('btn-collapse-all').addEventListener('click', collapseAll);
-document.getElementById('btn-expand-all').addEventListener('click', expandAll);
+document.getElementById('btn-toggle-all').addEventListener('click', toggleAllCollapse);
 
 // 以前のボタンは削除（セクションヘッダーがトグルになったため）
 
-document.getElementById('btn-save-session').addEventListener('click', () => {
+document.getElementById('btn-sessions').addEventListener('click', async () => {
   const input = document.getElementById('session-name-input');
   input.value = `セッション ${new Date().toLocaleString('ja-JP')}`;
-  openModal('modal-save-session');
+  openModal('modal-sessions');
+  loadSessionList();
   setTimeout(() => input.focus(), 100);
 });
 
@@ -2118,16 +2202,13 @@ document.getElementById('btn-confirm-save').addEventListener('click', async () =
   const name = document.getElementById('session-name-input').value.trim();
   try {
     await sendMessage('SAVE_SESSION', { name: name || undefined });
-    closeModal('modal-save-session');
+    // 保存後、リストを再読み込みして入力を初期化
+    loadSessionList();
+    document.getElementById('session-name-input').value = `セッション ${new Date().toLocaleString('ja-JP')}`;
     showToast(chrome.i18n.getMessage('toastSessionSaved'), 'success');
   } catch (e) {
     showToast(chrome.i18n.getMessage('toastSessionSaveFailed'), 'error');
   }
-});
-
-document.getElementById('btn-load-session').addEventListener('click', async () => {
-  openModal('modal-load-session');
-  await loadSessionList();
 });
 
 async function loadSessionList() {
@@ -2593,7 +2674,12 @@ function renderBookmarkTree(container, nodes) {
         parentEl.appendChild(el);
       } else if (node.children && node.children.length > 0 && node.title !== undefined) {
         const folderEl = document.createElement('div');
-        folderEl.className = `bookmark-folder ${state.bookmarkFolderState[node.id] ? 'collapsed' : ''}`;
+        // デフォルト設定：ルート(depth 0)は展開、それ以外は折りたたみ
+        const isCollapsed = state.bookmarkFolderState[node.id] !== undefined
+          ? state.bookmarkFolderState[node.id]
+          : depth > 0;
+
+        folderEl.className = `bookmark-folder ${isCollapsed ? 'collapsed' : ''}`;
 
         const header = document.createElement('div');
         header.className = 'bookmark-folder-header';
@@ -2611,8 +2697,11 @@ function renderBookmarkTree(container, nodes) {
           <span class="bookmark-folder-count">${countBookmarks(node.children)}</span>
         `;
         header.addEventListener('click', () => {
-          state.bookmarkFolderState[node.id] = !state.bookmarkFolderState[node.id];
-          folderEl.classList.toggle('collapsed', state.bookmarkFolderState[node.id]);
+          const currentlyCollapsed = state.bookmarkFolderState[node.id] !== undefined
+            ? state.bookmarkFolderState[node.id]
+            : depth > 0;
+          state.bookmarkFolderState[node.id] = !currentlyCollapsed;
+          folderEl.classList.toggle('collapsed', !currentlyCollapsed);
         });
         folderEl.appendChild(header);
 
@@ -2845,6 +2934,10 @@ async function init() {
   loadTabConfig();
   renderNavTabs();
   renderSettingsPanel();
+  applyColorScheme();
+  applyThemeColor(state.userSettings.themeColor || 'blue');
+  applyToggleSize();
+  applyFocusIntensity();
   await loadTabs();
 }
 
@@ -2864,3 +2957,42 @@ function localizeHtmlPage() {
   });
 }
 document.addEventListener('DOMContentLoaded', localizeHtmlPage);
+let recentTimeUpdateInterval = null;
+function startRecentTimeUpdateTimer() {
+  if (recentTimeUpdateInterval) return;
+  recentTimeUpdateInterval = setInterval(() => {
+    if (state.tabSortMode === 'recent') {
+      renderTabTree();
+    }
+  }, 10000); // 10秒おきに再描画
+}
+function stopRecentTimeUpdateTimer() {
+  if (recentTimeUpdateInterval) {
+    clearInterval(recentTimeUpdateInterval);
+    recentTimeUpdateInterval = null;
+  }
+}
+
+function applyToggleSize() {
+  const size = state.userSettings.toggleSize || 'medium';
+  document.body.setAttribute('data-toggle-size', size);
+}
+
+function applyFocusIntensity() {
+  const intensity = state.userSettings.focusIntensity || 'medium';
+  document.body.setAttribute('data-focus-intensity', intensity);
+}
+
+// サイドパネルのフォーカス状態を管理
+function updateFocusState() {
+  if (document.hasFocus()) {
+    document.body.classList.add('sidepanel-focused');
+  } else {
+    document.body.classList.remove('sidepanel-focused');
+  }
+}
+
+window.addEventListener('focus', updateFocusState);
+window.addEventListener('blur', updateFocusState);
+// 初期実行
+updateFocusState();
