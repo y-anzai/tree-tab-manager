@@ -473,5 +473,20 @@
     },
     "actionToggleMiniTree": {
         "message": "Toggle Mini Tree (90px)"
+    },
+    "toolbarToggleMiniTree": {
+        "message": "Show/Hide Mini Tree"
+    },
+    "settingsSidePanelSide": {
+        "message": "Side Panel Position (Left/Right)"
+    },
+    "sideLeft": {
+        "message": "Left"
+    },
+    "sideRight": {
+        "message": "Right"
+    },
+    "settingsMiniTreeWidth": {
+        "message": "Mini Tree Width"
     }
 }

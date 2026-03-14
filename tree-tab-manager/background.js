@@ -173,7 +173,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             favIconUrl: t.favIconUrl,
             active: t.active,
             pinned: t.pinned,
-            windowId: t.windowId
+            windowId: t.windowId,
+            index: t.index
           })),
           parents: Object.fromEntries(tabParentMap)
         });
@@ -192,6 +193,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
 
+    case 'MINI_TREE_MOVE_TAB':
+      chrome.tabs.move(message.tabId, { index: message.index })
+        .then(() => sendResponse({ success: true }));
+      return true;
+
   }
   return false;
 });
@@ -205,7 +211,7 @@ function notifyPanels(message) {
   if (message.type === 'TREE_UPDATED' || message.type === 'TAB_CREATED' || message.type === 'TAB_REMOVED' || message.type === 'TAB_UPDATED' || message.type === 'TAB_ACTIVATED') {
     chrome.tabs.query({ currentWindow: true }).then(tabs => {
       tabs.forEach(tab => {
-        if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:') || tab.url.startsWith('chrome-extension://')) return;
+        if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) return;
         chrome.tabs.sendMessage(tab.id, { type: 'MINI_TREE_REFRESH', event: message }).catch(() => { });
       });
     });
@@ -311,4 +317,70 @@ async function deleteSession(sessionId) {
   const result = await chrome.storage.local.get('sessions');
   const sessions = (result.sessions || []).filter(s => s.id !== sessionId);
   await chrome.storage.local.set({ sessions });
+}
+
+// ===== 物理タブの並び順同期 (ツリー形式) =====
+let isSyncing = false;
+
+// 定期的に実行 (5秒おき)
+setInterval(async () => {
+  if (isSyncing) return;
+  const res = await chrome.storage.local.get('ttm-tab-sort-mode');
+  if (res['ttm-tab-sort-mode'] === 'tree') {
+    isSyncing = true;
+    try {
+      await syncPhysicalTabsWithTree();
+    } finally {
+      isSyncing = false;
+    }
+  }
+}, 5000);
+
+async function syncPhysicalTabsWithTree() {
+  const windows = await chrome.windows.getAll({ populate: true });
+
+  for (const win of windows) {
+    const tabs = win.tabs;
+    if (!tabs || tabs.length <= 1) continue;
+
+    // 現在のウィンドウ内での親子関係を考慮してツリー構築
+    const tabMap = new Map();
+    tabs.forEach(t => tabMap.set(t.id, { id: t.id, children: [] }));
+
+    const roots = [];
+    tabs.forEach(t => {
+      const parentId = tabParentMap.get(t.id);
+      if (parentId && tabMap.has(parentId)) {
+        tabMap.get(parentId).children.push(tabMap.get(t.id));
+      } else {
+        roots.push(tabMap.get(t.id));
+      }
+    });
+
+    // ツリーを平坦化 (行きがけ順)
+    const sortedIds = [];
+    const flatten = (nodes) => {
+      nodes.forEach(n => {
+        sortedIds.push(n.id);
+        if (n.children.length > 0) flatten(n.children);
+      });
+    };
+    flatten(roots);
+
+    // 現在の物理的なID並びと比較
+    const currentIds = tabs.map(t => t.id);
+    const hasChanged = sortedIds.some((id, idx) => id !== currentIds[idx]);
+
+    if (hasChanged) {
+      console.log("[TTM] Syncing tab order to match tree structure...");
+      // 一括移動 (インデックス0から順番に配置)
+      // 注意: ピン留めタブが混ざっている場合は、Chromeの制約でピン留めは前に、
+      // 通常タブは後に配置されるため、完全な一致にならない場合がある
+      try {
+        await chrome.tabs.move(sortedIds, { windowId: win.id, index: 0 });
+      } catch (e) {
+        // タブが閉じられた直後などのエラーは無視
+      }
+    }
+  }
 }

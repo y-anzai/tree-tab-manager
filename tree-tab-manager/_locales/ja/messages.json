@@ -473,5 +473,20 @@
   },
   "actionToggleMiniTree": {
     "message": "ミニツリー表示切替 (90px)"
+  },
+  "toolbarToggleMiniTree": {
+    "message": "ミニツリーを表示/非表示"
+  },
+  "settingsSidePanelSide": {
+    "message": "サイドパネルの位置（左/右）"
+  },
+  "sideLeft": {
+    "message": "左"
+  },
+  "sideRight": {
+    "message": "右"
+  },
+  "settingsMiniTreeWidth": {
+    "message": "ミニツリーの幅"
   }
 }

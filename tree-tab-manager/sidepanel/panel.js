@@ -40,6 +40,8 @@ const state = {
     bookmarkVisitCount: false,
     themeColor: 'blue',
     colorScheme: 'auto',
+    sidePanelSide: 'right',
+    miniTreeWidth: 90,
     shortcuts: {
       'new-tab': 'Alt+N',
       'toggle-pinned': 'Alt+P',
@@ -243,6 +245,13 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
   if (sel) sel.value = next;
 });
 
+document.getElementById('btn-toggle-mini-tree').addEventListener('click', () => {
+  chrome.storage.local.get('ttm-mini-tree-visible', (res) => {
+    const next = !res['ttm-mini-tree-visible'];
+    chrome.storage.local.set({ 'ttm-mini-tree-visible': next });
+  });
+});
+
 // ===== タブ並び順モード管理 =====
 // 'tree'（ツリー表示）| 'recent'（最近開いた順フラット表示）
 
@@ -255,6 +264,8 @@ function applySortMode(mode) {
   btn.title = mode === 'recent'
     ? chrome.i18n.getMessage('sortRecentTooltip')
     : chrome.i18n.getMessage('sortTreeTooltip');
+  // background.jsが読み込めるように同期
+  chrome.storage.local.set({ 'ttm-tab-sort-mode': mode });
 }
 
 // 保存された並び順を復元（なければ 'tree'）
@@ -262,6 +273,7 @@ state.tabSortMode = (() => {
   try { return localStorage.getItem('ttm-tabSortMode') || 'tree'; } catch { return 'tree'; }
 })();
 applySortMode(state.tabSortMode);
+chrome.storage.local.set({ 'ttm-tab-sort-mode': state.tabSortMode });
 
 document.getElementById('btn-sort-mode').addEventListener('click', () => {
   const next = state.tabSortMode === 'tree' ? 'recent' : 'tree';
@@ -434,8 +446,12 @@ function loadUserSettings() {
     }
   } catch (e) { }
   applyColorScheme();
-  // 起動時にショートカットをcontent scriptが読めるようにsync
-  chrome.storage.local.set({ 'ttm-shortcuts': state.userSettings.shortcuts || {} });
+  // 起動時にショートカットと位置設定、幅をcontent scriptが読めるようにsync
+  chrome.storage.local.set({
+    'ttm-shortcuts': state.userSettings.shortcuts || {},
+    'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
+    'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
+  });
 }
 
 let saveTimeout = null;
@@ -449,8 +465,12 @@ function saveUserSettingsDebounced() {
 function saveUserSettings() {
   try {
     localStorage.setItem('ttm-user-settings', JSON.stringify(state.userSettings));
-    // ショートカット設定をcontent scriptが読めるようにchrome.storage.localにも保存
-    chrome.storage.local.set({ 'ttm-shortcuts': state.userSettings.shortcuts || {} });
+    // content scriptが読めるようにchrome.storage.localにも同期
+    chrome.storage.local.set({
+      'ttm-shortcuts': state.userSettings.shortcuts || {},
+      'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
+      'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
+    });
   } catch (e) { }
 }
 
@@ -693,6 +713,31 @@ function renderSettingsPanel() {
     selDisplayMode.value = state.displayMode;
     selDisplayMode.onchange = (e) => {
       applyDisplayMode(e.target.value);
+    };
+  }
+
+  // サイドパネルの位置設定
+  const selSide = document.getElementById('setting-side-panel-side');
+  if (selSide) {
+    selSide.value = state.userSettings.sidePanelSide || 'right';
+    selSide.onchange = (e) => {
+      state.userSettings.sidePanelSide = e.target.value;
+      saveUserSettings();
+    };
+  }
+
+  // ミニツリーの幅設定
+  const sliderWidth = document.getElementById('setting-mini-tree-width');
+  const spanWidth = document.getElementById('mini-tree-width-value');
+  if (sliderWidth && spanWidth) {
+    const val = state.userSettings.miniTreeWidth || 90;
+    sliderWidth.value = val;
+    spanWidth.textContent = `${val}px`;
+    sliderWidth.oninput = (e) => {
+      const v = parseInt(e.target.value);
+      spanWidth.textContent = `${v}px`;
+      state.userSettings.miniTreeWidth = v;
+      saveUserSettingsDebounced();
     };
   }
 
