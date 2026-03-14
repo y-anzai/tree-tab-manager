@@ -59,6 +59,12 @@
     "sortTree": {
         "message": "Tree"
     },
+    "sortTreeTooltip": {
+        "message": "Sort: Tree (Click for Recent)"
+    },
+    "sortRecentTooltip": {
+        "message": "Sort: Recent (Click for Tree)"
+    },
     "bookmarkSearchPlaceholder": {
         "message": "Search bookmarks..."
     },
@@ -383,6 +389,15 @@
     },
     "modeMini": {
         "message": "Mini"
+    },
+    "modeTitleFull": {
+        "message": "Display: Full (Click to switch)"
+    },
+    "modeTitleCompact": {
+        "message": "Display: Compact (Click to switch)"
+    },
+    "modeTitleMini": {
+        "message": "Display: Mini (Click to switch)"
     },
     "displayMode": {
         "message": "Switch Display Mode"

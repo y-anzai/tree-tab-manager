@@ -78,7 +78,13 @@ function applyDisplayMode(mode) {
   const btn = document.getElementById('btn-display-mode');
   if (!btn) return;
   btn.innerHTML = MODE_ICONS[mode];
-  btn.title = `表示モード: ${MODE_LABELS[mode]}（クリックで切替）`;
+
+  let titleStr = '';
+  if (mode === 'full') titleStr = chrome.i18n.getMessage('modeTitleFull');
+  else if (mode === 'compact') titleStr = chrome.i18n.getMessage('modeTitleCompact');
+  else if (mode === 'mini') titleStr = chrome.i18n.getMessage('modeTitleMini');
+
+  btn.title = titleStr;
   btn.classList.toggle('mode-active-compact', mode === 'compact');
   btn.classList.toggle('mode-active-mini', mode === 'mini');
 }
@@ -124,8 +130,8 @@ function applySortMode(mode) {
   if (!btn) return;
   btn.classList.toggle('sort-mode-active', mode === 'recent');
   btn.title = mode === 'recent'
-    ? '並び順: 最近開いた順（クリックでツリー順に戻す）'
-    : '並び順: ツリー（クリックで最近開いた順に）';
+    ? chrome.i18n.getMessage('sortRecentTooltip')
+    : chrome.i18n.getMessage('sortTreeTooltip');
 }
 
 // 保存された並び順を復元（なければ 'tree'）
@@ -238,6 +244,14 @@ function loadTabConfig() {
       const merged = parsed.filter(p => DEFAULT_TAB_CONFIG.some(d => d.id === p.id));
       DEFAULT_TAB_CONFIG.forEach(d => {
         if (!merged.some(m => m.id === d.id)) merged.push(d);
+      });
+      // Override label and icon with the current localized version
+      merged.forEach(m => {
+        const defaultDef = DEFAULT_TAB_CONFIG.find(d => d.id === m.id);
+        if (defaultDef) {
+          m.label = defaultDef.label;
+          m.icon = defaultDef.icon;
+        }
       });
       state.tabConfig = merged;
     } else {
@@ -796,7 +810,7 @@ function renderTabTree() {
   if (pinnedTotal === 0 && normalTabs.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3z"/></svg>
-      <p>タブが見つかりません</p>
+      <p>${chrome.i18n.getMessage('emptyTabs')}</p>
     </div>`;
   }
 }
@@ -1607,14 +1621,14 @@ document.getElementById('btn-load-session').addEventListener('click', async () =
 
 async function loadSessionList() {
   const list = document.getElementById('session-list');
-  list.innerHTML = '<div class="loading">読み込み中...</div>';
+  list.innerHTML = `<div class="loading">${chrome.i18n.getMessage('msgLoading')}</div>`;
 
   try {
     const resp = await sendMessage('LOAD_SESSIONS');
     const sessions = resp?.sessions || [];
 
     if (sessions.length === 0) {
-      list.innerHTML = '<div class="no-sessions">保存されたセッションがありません</div>';
+      list.innerHTML = `<div class="no-sessions">${chrome.i18n.getMessage('emptySessions')}</div>`;
       return;
     }
 
@@ -1659,7 +1673,7 @@ async function loadSessionList() {
       list.appendChild(item);
     });
   } catch (e) {
-    list.innerHTML = '<div class="no-sessions">読み込みに失敗しました</div>';
+    list.innerHTML = `<div class="no-sessions">${chrome.i18n.getMessage('emptySessionLoadFail')}</div>`;
   }
 }
 
@@ -1668,7 +1682,7 @@ let historySearchTimeout = null;
 
 async function loadHistory(query = '') {
   const container = document.getElementById('history-list');
-  container.innerHTML = '<div class="loading" data-i18n="msgLoading">読み込み中...</div>';
+  container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
 
   try {
     let recentSessions = [];
@@ -1698,7 +1712,7 @@ function renderHistory(items, query = '', recentSessions = []) {
   if (items.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd"/></svg>
-      <p>履歴が見つかりません</p>
+      <p>${chrome.i18n.getMessage('emptyHistory')}</p>
     </div>`;
     return;
   }
@@ -1854,7 +1868,7 @@ async function loadBookmarks() {
     return;
   }
 
-  container.innerHTML = '<div class="loading">読み込み中...</div>';
+  container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
 
   try {
     const [tree, recentHistory] = await Promise.all([
@@ -1877,7 +1891,7 @@ async function loadBookmarks() {
 
     renderBookmarks();
   } catch (e) {
-    container.innerHTML = '<div class="empty-state"><p>ブックマークの読み込みに失敗しました</p></div>';
+    container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyBookmarkLoadFail')}</p></div>`;
   }
 }
 

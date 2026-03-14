@@ -59,6 +59,12 @@
   "sortTree": {
     "message": "ツリー"
   },
+  "sortTreeTooltip": {
+    "message": "並び順: ツリー（クリックで最近開いた順に）"
+  },
+  "sortRecentTooltip": {
+    "message": "並び順: 最近開いた順（クリックでツリー順に戻す）"
+  },
   "bookmarkSearchPlaceholder": {
     "message": "お気に入りを検索..."
   },
@@ -383,6 +389,15 @@
   },
   "modeMini": {
     "message": "ミニ"
+  },
+  "modeTitleFull": {
+    "message": "表示モード: 標準（クリックで切替）"
+  },
+  "modeTitleCompact": {
+    "message": "表示モード: コンパクト（クリックで切替）"
+  },
+  "modeTitleMini": {
+    "message": "表示モード: ミニ（クリックで切替）"
   },
   "displayMode": {
     "message": "表示モード切替"
