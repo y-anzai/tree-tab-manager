@@ -249,12 +249,16 @@ body.mode-mini .header-title-text {
   display: flex;
   align-items: center;
   height: var(--tab-height);
-  padding-right: 6px;
+  padding-right: 4px;
   cursor: pointer;
   border-radius: var(--radius-sm);
   transition: background var(--transition);
   position: relative;
   margin: 1px 4px;
+  width: auto;
+  /* padding-left と box-sizing: border-box で親の幅内に収まる */
+  overflow: hidden;
+  /* 万が一の溢れを防止 */
 }
 
 .tab-item:hover .tab-content-wrapper {
@@ -269,6 +273,8 @@ body.mode-mini .header-title-text {
   display: flex;
   align-items: center;
   flex: 1;
+  min-width: 0;
+  /* 子供の ellipsis を効かせるために必須 */
   height: min-content;
   min-height: 28px;
   border-radius: var(--radius-sm);
@@ -447,6 +453,8 @@ body.mode-mini .header-title-text {
   align-items: center;
   gap: 2px;
   margin-left: 4px;
+  margin-right: 4px;
+  /* バッジとの間に隙間を作る */
 }
 
 .tab-item:hover .tab-actions {
@@ -478,8 +486,29 @@ body.mode-mini .header-title-text {
   background: var(--bg-active);
 }
 
+/* 左側固定のバツボタン */
+.left-action {
+  opacity: 0;
+  width: 0;
+  margin-right: 0;
+  transition: all var(--transition);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tab-item:hover .left-action {
+  opacity: 1;
+  width: 20px;
+  margin-right: 2px;
+}
+
 .tab-action-btn.close-btn:hover {
   color: var(--accent-red);
+}
+
+.tab-action-btn.left-action svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* 子ツリー */
@@ -499,12 +528,34 @@ body.mode-mini .header-title-text {
   color: var(--text-muted);
   border-radius: 10px;
   padding: 1px 6px;
-  margin-left: 2px;
+  margin-left: auto;
+  /* 右端に固定 */
   flex-shrink: 0;
-  min-width: 22px;
+  /* 絶対に縮まない */
+  min-width: 24px;
   text-align: center;
-  transition: background var(--transition), color var(--transition);
+  transition: all var(--transition);
+  z-index: 5;
 }
+
+.desc-badge.clickable-toggle {
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+.desc-badge.clickable-toggle:hover {
+  background: var(--theme-color);
+  color: var(--bg-primary);
+  box-shadow: 0 0 8px var(--theme-color);
+}
+
+.desc-badge.clickable-toggle.collapsed {
+  background: color-mix(in srgb, var(--theme-color) 20%, transparent);
+  color: var(--theme-color);
+  border-color: var(--theme-color);
+}
+
 
 /* 折りたたみ時は少し目立たせる */
 .tab-toggle.collapsed+img~.tab-info+.desc-badge,
@@ -552,8 +603,41 @@ body.mode-mini .header-title-text {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 4px 12px 2px;
+  padding: 6px 12px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+
+.collapsible-section {
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition), color var(--transition);
+}
+
+.collapsible-section:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.section-toggle {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition);
+}
+
+.section-toggle svg {
+  width: 10px;
+  height: 10px;
+}
+
+.collapsible-section.collapsed .section-toggle {
+  transform: rotate(-90deg);
+}
+
 
 /* ===== ローディング ===== */
 .loading {
@@ -1354,25 +1438,29 @@ body.mode-mini .header-title-text {
 .tab-item.drag-over-above::before {
   content: '';
   position: absolute;
-  top: -1px;
-  left: 8px;
-  right: 8px;
-  height: 2px;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
   background: var(--theme-color);
-  border-radius: 1px;
-  z-index: 10;
+  border-radius: 2px;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 0 4px var(--theme-color);
 }
 
 .tab-item.drag-over-below::after {
   content: '';
   position: absolute;
-  bottom: -1px;
-  left: 8px;
-  right: 8px;
-  height: 2px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
   background: var(--theme-color);
-  border-radius: 1px;
-  z-index: 10;
+  border-radius: 2px;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 0 4px var(--theme-color);
 }
 
 .tab-item.drag-over-inside {
