@@ -470,5 +470,8 @@
     },
     "actionSwitchSettings": {
         "message": "Switch to Settings"
+    },
+    "actionToggleMiniTree": {
+        "message": "Toggle Mini Tree (90px)"
     }
 }

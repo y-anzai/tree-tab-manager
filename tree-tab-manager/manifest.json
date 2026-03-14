@@ -12,8 +12,7 @@
     "storage",
     "sessions",
     "sidePanel",
-    "sessions",
-    "sidePanel"
+    "scripting"
   ],
   "commands": {
     "_execute_action": {
@@ -24,6 +23,19 @@
       "description": "__MSG_shortcutToggle__"
     }
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/mini-tree.js"
+      ],
+      "css": [
+        "content/mini-tree.css"
+      ]
+    }
+  ],
   "side_panel": {
     "default_path": "sidepanel/index.html"
   },

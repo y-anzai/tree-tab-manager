@@ -51,7 +51,8 @@ const state = {
       'switch-tabs': 'Alt+1',
       'switch-history': 'Alt+2',
       'switch-bookmarks': 'Alt+3',
-      'switch-settings': 'Alt+4'
+      'switch-settings': 'Alt+4',
+      'toggle-mini-tree': 'Cmd+Shift+X'
     }
   },
   isRecordingShortcut: false,
@@ -72,7 +73,8 @@ const SHORTCUT_ACTIONS = [
   { id: 'display-mode', label: chrome.i18n.getMessage('actionDisplayMode') },
   { id: 'sort-mode', label: chrome.i18n.getMessage('actionSortMode') },
   { id: 'collapse-all', label: chrome.i18n.getMessage('actionCollapseAll') },
-  { id: 'expand-all', label: chrome.i18n.getMessage('actionExpandAll') }
+  { id: 'expand-all', label: chrome.i18n.getMessage('actionExpandAll') },
+  { id: 'toggle-mini-tree', label: chrome.i18n.getMessage('actionToggleMiniTree') }
 ];
 
 // デフォルトのタブ設定
@@ -334,6 +336,13 @@ function handleShortcutAction(actionId) {
     case 'expand-all':
       document.getElementById('btn-expand-all')?.click();
       break;
+    case 'toggle-mini-tree':
+      // アクティブタブのcontent scriptへトグルを送信
+      chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+        if (!tab || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) return;
+        chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
+      });
+      break;
   }
 }
 
@@ -425,6 +434,8 @@ function loadUserSettings() {
     }
   } catch (e) { }
   applyColorScheme();
+  // 起動時にショートカットをcontent scriptが読めるようにsync
+  chrome.storage.local.set({ 'ttm-shortcuts': state.userSettings.shortcuts || {} });
 }
 
 let saveTimeout = null;
@@ -438,6 +449,8 @@ function saveUserSettingsDebounced() {
 function saveUserSettings() {
   try {
     localStorage.setItem('ttm-user-settings', JSON.stringify(state.userSettings));
+    // ショートカット設定をcontent scriptが読めるようにchrome.storage.localにも保存
+    chrome.storage.local.set({ 'ttm-shortcuts': state.userSettings.shortcuts || {} });
   } catch (e) { }
 }
 
@@ -766,7 +779,8 @@ function renderShortcutsSettings() {
         'switch-tabs': 'Alt+1',
         'switch-history': 'Alt+2',
         'switch-bookmarks': 'Alt+3',
-        'switch-settings': 'Alt+4'
+        'switch-settings': 'Alt+4',
+        'toggle-mini-tree': 'Cmd+Shift+X'
       };
       state.userSettings.shortcuts[action.id] = defaults[action.id] || '';
       saveUserSettings();

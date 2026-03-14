@@ -15,6 +15,18 @@ chrome.action.onClicked.addListener((tab) => {
   chrome.sidePanel.open({ windowId: tab.windowId });
 });
 
+// コマンドリスナー（ショートカットキー）
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'toggle-mini-tree') {
+    // アクティブタブにトグルメッセージを送信
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!activeTab) return;
+    // chrome:// や about: ページはコンテンツスクリプト不可
+    if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
+    chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
+  }
+});
+
 // タブ作成時に親子関係を記録
 chrome.tabs.onCreated.addListener((tab) => {
   if (tab.openerTabId !== undefined) {
@@ -150,15 +162,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       deleteSession(message.sessionId).then(() => sendResponse({ success: true }));
       return true;
 
+    case 'GET_MINI_TREE_DATA': {
+      // コンテンツスクリプト用: 現在ウィンドウのタブ一覧 + 親子関係を返す
+      chrome.tabs.query({ currentWindow: true }).then((tabs) => {
+        sendResponse({
+          tabs: tabs.map(t => ({
+            id: t.id,
+            title: t.title,
+            url: t.url,
+            favIconUrl: t.favIconUrl,
+            active: t.active,
+            pinned: t.pinned,
+            windowId: t.windowId
+          })),
+          parents: Object.fromEntries(tabParentMap)
+        });
+      });
+      return true;
+    }
+
+    case 'MINI_TREE_ACTIVATE_TAB':
+      chrome.tabs.update(message.tabId, { active: true })
+        .then(() => chrome.windows.update(message.windowId, { focused: true }))
+        .then(() => sendResponse({ success: true }));
+      return true;
+
+    case 'MINI_TREE_TOGGLE_COLLAPSE':
+      // collapseStateはコンテンツスクリプト側で管理するため confirmだけ
+      sendResponse({ success: true });
+      break;
+
   }
   return false;
 });
 
-// 全サイドパネルに通知
+// 全サイドパネルおよびミニツリーに通知
 function notifyPanels(message) {
   chrome.runtime.sendMessage(message).catch(() => {
     // サイドパネルが開いていない場合はエラーを無視
   });
+  // ミニツリーが開いているタブにも通知
+  if (message.type === 'TREE_UPDATED' || message.type === 'TAB_CREATED' || message.type === 'TAB_REMOVED' || message.type === 'TAB_UPDATED' || message.type === 'TAB_ACTIVATED') {
+    chrome.tabs.query({ currentWindow: true }).then(tabs => {
+      tabs.forEach(tab => {
+        if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:') || tab.url.startsWith('chrome-extension://')) return;
+        chrome.tabs.sendMessage(tab.id, { type: 'MINI_TREE_REFRESH', event: message }).catch(() => { });
+      });
+    });
+  }
 }
 
 // セッション保存
