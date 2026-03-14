@@ -190,8 +190,9 @@ function buildTree(tabs, parents) {
 // ===== レンダリング =====
 function escHtml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function getFavicon(tab) {
-  if (tab.favIconUrl && !tab.favIconUrl.startsWith('chrome://')) return tab.favIconUrl;
-  try { return `${new URL(tab.url).origin}/favicon.ico`; } catch { return ''; }
+  const url = tab.url || '';
+  if (!url) return '';
+  return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(url)}&size=32`;
 }
 
 function renderNode(node, depth, isLast = false, parentIsLast = []) {

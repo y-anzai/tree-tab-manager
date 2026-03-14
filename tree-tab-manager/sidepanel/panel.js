@@ -411,12 +411,9 @@ function formatDate(timestamp) {
 }
 
 function getFaviconUrl(url) {
-  try {
-    const u = new URL(url);
-    return `https://www.google.com/s2/favicons?sz=16&domain=${u.hostname}`;
-  } catch {
-    return null;
-  }
+  if (!url) return null;
+  // Chromeの拡張機能専用faviconサービスを利用 (manifestのfavicon権限が必要)
+  return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(url)}&size=32`;
 }
 
 function escapeHtml(str) {

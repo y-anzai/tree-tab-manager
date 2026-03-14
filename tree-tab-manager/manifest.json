@@ -13,7 +13,8 @@
     "sessions",
     "sidePanel",
     "scripting",
-    "readingList"
+    "readingList",
+    "favicon"
   ],
   "commands": {
     "_execute_action": {
