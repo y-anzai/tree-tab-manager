@@ -1858,6 +1858,11 @@ document.getElementById('history-search').addEventListener('input', (e) => {
   }, 300);
 });
 
+document.getElementById('btn-refresh-history').addEventListener('click', () => {
+  const query = document.getElementById('history-search').value.trim();
+  loadHistory(query);
+});
+
 // ===== ブックマークパネル =====
 let bookmarkSearchTimeout = null;
 

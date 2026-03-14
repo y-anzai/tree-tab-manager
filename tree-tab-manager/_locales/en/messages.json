@@ -390,6 +390,9 @@
     "modeMini": {
         "message": "Mini"
     },
+    "btnRefreshHistory": {
+        "message": "Refresh History"
+    },
     "modeTitleFull": {
         "message": "Display: Full (Click to switch)"
     },

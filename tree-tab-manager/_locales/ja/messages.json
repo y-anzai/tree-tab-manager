@@ -390,6 +390,9 @@
   "modeMini": {
     "message": "ミニ"
   },
+  "btnRefreshHistory": {
+    "message": "履歴を更新"
+  },
   "modeTitleFull": {
     "message": "表示モード: 標準（クリックで切替）"
   },
