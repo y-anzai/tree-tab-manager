@@ -33,7 +33,18 @@ const state = {
   // タブ名カスタマイズ
   customTabNames: {},    // tabId -> customName
   tabCustomNamesByUrl: {}, // url -> customName（再訪時のため）
+
+  // タブ管理・設定
+  tabConfig: []
 };
+
+// デフォルトのタブ設定
+const DEFAULT_TAB_CONFIG = [
+  { id: 'tabs', label: 'タブ', visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/></svg>' },
+  { id: 'history', label: '履歴', visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>' },
+  { id: 'bookmarks', label: 'お気に入り', visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>' },
+  { id: 'settings', label: '設定', visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>' }
+];
 
 // ===== 表示モード管理 =====
 const DISPLAY_MODES = ['full', 'compact', 'mini'];
@@ -191,19 +202,164 @@ function getDefaultFavicon() {
   </span>`;
 }
 
-// ===== タブナビゲーション =====
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const panelId = btn.dataset.panel;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(`panel-${panelId}`).classList.add('active');
+// ===== タブナビゲーション設定管理 =====
+function loadTabConfig() {
+  try {
+    const saved = localStorage.getItem('ttm-tab-config');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Ensure all defaults exist in parsed (in case of updates)
+      const merged = parsed.filter(p => DEFAULT_TAB_CONFIG.some(d => d.id === p.id));
+      DEFAULT_TAB_CONFIG.forEach(d => {
+        if (!merged.some(m => m.id === d.id)) merged.push(d);
+      });
+      state.tabConfig = merged;
+    } else {
+      state.tabConfig = [...DEFAULT_TAB_CONFIG];
+    }
+  } catch (e) {
+    state.tabConfig = [...DEFAULT_TAB_CONFIG];
+  }
+}
 
-    if (panelId === 'history') loadHistory();
-    if (panelId === 'bookmarks') loadBookmarks();
+function saveTabConfig() {
+  try {
+    localStorage.setItem('ttm-tab-config', JSON.stringify(state.tabConfig));
+  } catch (e) {
+    console.error('Failed to save tab config', e);
+  }
+}
+
+function renderNavTabs() {
+  const nav = document.getElementById('main-nav');
+  const currentActive = nav.querySelector('.tab-btn.active')?.dataset?.panel || 'tabs';
+
+  nav.innerHTML = '';
+
+  const visibleTabs = state.tabConfig.filter(t => t.visible);
+
+  visibleTabs.forEach(tab => {
+    const btn = document.createElement('button');
+    btn.className = `tab-btn ${tab.id === currentActive ? 'active' : ''}`;
+    btn.dataset.panel = tab.id;
+    btn.innerHTML = `${tab.icon} ${escapeHtml(tab.label)}`;
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = document.getElementById(`panel-${tab.id}`);
+      if (panel) panel.classList.add('active');
+
+      if (tab.id === 'history') loadHistory();
+      if (tab.id === 'bookmarks') loadBookmarks();
+    });
+    nav.appendChild(btn);
   });
-});
+
+  // Ensure an active panel exists, fallback to first visible tab
+  if (!visibleTabs.some(t => t.id === currentActive) && visibleTabs.length > 0) {
+    const firstId = visibleTabs[0].id;
+    nav.querySelector(`[data-panel="${firstId}"]`).classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`panel-${firstId}`).classList.add('active');
+  }
+}
+
+// ===== 設定パネル =====
+let dragSettingId = null;
+
+function renderSettingsPanel() {
+  const list = document.getElementById('tab-visibility-list');
+  list.innerHTML = '';
+
+  state.tabConfig.forEach((tab, index) => {
+    const item = document.createElement('div');
+    item.className = 'settings-item';
+    item.draggable = true;
+    item.dataset.id = tab.id;
+
+    const isSettings = tab.id === 'settings';
+    const checkboxDisabled = isSettings ? 'disabled' : '';
+    const checkedHtml = tab.visible ? 'checked' : '';
+
+    item.innerHTML = `
+      <div class="settings-item-drag">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm1 4a1 1 0 100 2h12a1 1 0 100-2H4z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="settings-item-label">
+        ${tab.icon} ${escapeHtml(tab.label)}
+      </div>
+      <input type="checkbox" class="settings-checkbox" ${checkedHtml} ${checkboxDisabled} title="${isSettings ? '設定タブは非表示にできません' : '表示/非表示'}">
+    `;
+
+    // チェックボックス切り替え
+    const cb = item.querySelector('.settings-checkbox');
+    cb.addEventListener('change', (e) => {
+      tab.visible = e.target.checked;
+      saveTabConfig();
+      renderNavTabs();
+    });
+
+    // ドラッグ＆ドロップ設定
+    item.addEventListener('dragstart', (e) => {
+      dragSettingId = tab.id;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tab.id);
+    });
+
+    item.addEventListener('dragend', () => {
+      dragSettingId = null;
+      item.classList.remove('dragging');
+      document.querySelectorAll('.settings-item').forEach(el => {
+        el.classList.remove('drag-over-above', 'drag-over-below');
+      });
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (dragSettingId === tab.id) return;
+      const rect = item.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+
+      item.classList.remove('drag-over-above', 'drag-over-below');
+      if (y < rect.height / 2) {
+        item.classList.add('drag-over-above');
+      } else {
+        item.classList.add('drag-over-below');
+      }
+    });
+
+    item.addEventListener('dragleave', () => {
+      item.classList.remove('drag-over-above', 'drag-over-below');
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      item.classList.remove('drag-over-above', 'drag-over-below');
+      if (!dragSettingId || dragSettingId === tab.id) return;
+
+      const rect = item.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const insertAfter = y >= rect.height / 2;
+
+      const oldIndex = state.tabConfig.findIndex(t => t.id === dragSettingId);
+      const draggedTab = state.tabConfig[oldIndex];
+      const targetIndex = state.tabConfig.findIndex(t => t.id === tab.id);
+
+      // 配列を再構築
+      state.tabConfig.splice(oldIndex, 1);
+      const newTargetIndex = state.tabConfig.findIndex(t => t.id === tab.id);
+      state.tabConfig.splice(insertAfter ? newTargetIndex + 1 : newTargetIndex, 0, draggedTab);
+
+      saveTabConfig();
+      renderNavTabs();
+      renderSettingsPanel();
+    });
+
+    list.appendChild(item);
+  });
+}
 
 // ===== モーダル管理 =====
 function openModal(id) {
@@ -1869,6 +2025,9 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // ===== 初期化 =====
 async function init() {
+  loadTabConfig();
+  renderNavTabs();
+  renderSettingsPanel();
   await loadTabs();
 }
 
