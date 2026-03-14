@@ -12,7 +12,8 @@
     "storage",
     "sessions",
     "sidePanel",
-    "scripting"
+    "scripting",
+    "readingList"
   ],
   "commands": {
     "_execute_action": {

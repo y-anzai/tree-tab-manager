@@ -82,8 +82,9 @@ const SHORTCUT_ACTIONS = [
 // デフォルトのタブ設定
 const DEFAULT_TAB_CONFIG = [
   { id: 'tabs', label: chrome.i18n.getMessage('navTabs'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/></svg>' },
-  { id: 'history', label: chrome.i18n.getMessage('navHistory'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>' },
+  { id: 'history', label: chrome.i18n.getMessage('navHistory'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>' },
   { id: 'bookmarks', label: chrome.i18n.getMessage('navBookmarks'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>' },
+  { id: 'readingList', label: chrome.i18n.getMessage('navReadingList'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.993 7.993 0 002 8c0 .344.033.677.095 1H5.82a2 2 0 011.61 1.61l.17.68h3.805a2 2 0 011.61-1.61l.17-.68h3.725c.062-.323.095-.656.095-1 0-3.196-2.6-5.804-5.804-5.804z"/><path d="M10 5.804c.344 0 .677.033 1 .095v3.424a2 2 0 01-1.61 1.61l-.68.17v3.801a2 2 0 011.61-1.61l.68-.17h3.424A7.993 7.993 0 0011 11c0-.344-.033-.677-.095-1V6.576a2 2 0 011.61-1.61l.68-.17V1.031A8.003 8.003 0 0010 1c-3.196 0-5.804 2.6-5.804 5.804v3.424A2 2 0 012.586 11.838l.68.17V15.809a2 2 0 01-1.61 1.61l-.68.17v3.424A7.993 7.993 0 005 21c3.196 0 5.804-2.6 5.804-5.804v-3.424a2 2 0 01-1.61-1.61l-.68-.17V6.576c3.196 0 5.804-2.6 5.804-5.804V1.03a8.003 8.003 0 00-1 .095V5.804z"/></svg>' },
   { id: 'settings', label: chrome.i18n.getMessage('navSettings'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>' }
 ];
 
@@ -532,6 +533,7 @@ function renderNavTabs() {
 
       if (tab.id === 'history') loadHistory();
       if (tab.id === 'bookmarks') loadBookmarks();
+      if (tab.id === 'readingList') loadReadingList();
     });
     nav.appendChild(btn);
   });
@@ -1444,6 +1446,7 @@ function showTabContextMenu(x, y, tab) {
     pencil: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
     copy: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/><path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`,
     close: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    readingList: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M9 4.804A7.993 7.993 0 002 8c0 .344.033.677.095 1H5.82a2 2 0 011.61 1.61l.17.68h3.805a2 2 0 011.61-1.61l.17-.68h3.725c.062-.323.095-.656.095-1 0-3.196-2.6-5.804-5.804-5.804z"/><path d="M10 5.804c.344 0 .677.033 1 .095v3.424a2 2 0 01-1.61 1.61l-.68.17v3.801a2 2 0 011.61-1.61l.68-.17h3.424A7.993 7.993 0 0011 11c0-.344-.033-.677-.095-1V6.576a2 2 0 011.61-1.61l.68-.17V1.031A8.003 8.003 0 0010 1c-3.196 0-5.804 2.6-5.804 5.804v3.424A2 2 0 012.586 11.838l.68.17V15.809a2 2 0 01-1.61 1.61l-.68.17v3.424A7.993 7.993 0 005 21c3.196 0 5.804-2.6 5.804-5.804v-3.424a2 2 0 01-1.61-1.61l-.68-.17V6.576c3.196 0 5.804-2.6 5.804-5.804V1.03a8.003 8.003 0 00-1 .095V5.804z"/></svg>`,
   };
 
   const menuItems = [
@@ -1600,6 +1603,22 @@ function showTabContextMenu(x, y, tab) {
       icon: ICON.copy,
       action: () => {
         navigator.clipboard.writeText(tab.url).then(() => showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success'));
+      }
+    },
+    {
+      label: chrome.i18n.getMessage('ctxAddToReadingList'),
+      icon: ICON.readingList,
+      action: async () => {
+        try {
+          await chrome.readingList.addEntry({
+            title: tab.title,
+            url: tab.url,
+            hasBeenRead: false
+          });
+          showToast(chrome.i18n.getMessage('toastAddedToReadingList'), 'success');
+        } catch (e) {
+          showToast('追加に失敗しました (既に存在する可能性があります)', 'error');
+        }
       }
     },
     { separator: true },
@@ -2626,6 +2645,131 @@ document.getElementById('bookmark-search').addEventListener('input', (e) => {
     renderBookmarks();
   }, 200);
 });
+
+// ===== リーディングリストパネル =====
+let readingListSearchTimeout = null;
+let readingListQuery = '';
+
+async function loadReadingList() {
+  const container = document.getElementById('reading-list-container');
+  if (!container) return;
+  container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
+
+  try {
+    const entries = await chrome.readingList.query({});
+    renderReadingList(entries);
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><p>リーディングリストの読み込みに失敗しました</p></div>`;
+  }
+}
+
+function renderReadingList(entries) {
+  const container = document.getElementById('reading-list-container');
+  if (!container) return;
+
+  let filtered = entries;
+  if (readingListQuery) {
+    const q = readingListQuery.toLowerCase();
+    filtered = entries.filter(e =>
+      (e.title || '').toLowerCase().includes(q) ||
+      (e.url || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 12h5v2h-5zM10 9h5v2h-5zM10 6h5v2h-5zM9 13v-1H4a1 1 0 01-1-1V5a1 1 0 011-1h5V3a1 1 0 011-1h6a1 1 0 011 1v10a1 1 0 01-1 1h-6a1 1 0 01-1-1zM5 11h3V5H5v6z"/></svg>
+      <p>リーディングリストは空です</p>
+    </div>`;
+    return;
+  }
+
+  // 未読を先に表示、次に更新日時順
+  filtered.sort((a, b) => {
+    if (a.hasBeenRead === b.hasBeenRead) return (b.lastUpdateTime || 0) - (a.lastUpdateTime || 0);
+    return a.hasBeenRead ? 1 : -1;
+  });
+
+  container.innerHTML = '';
+  filtered.forEach(entry => {
+    const el = document.createElement('div');
+    el.className = `history-item reading-list-item ${entry.hasBeenRead ? 'read' : 'unread'}`;
+    const faviconUrl = getFaviconUrl(entry.url);
+
+    el.innerHTML = `
+      ${faviconUrl
+        ? `<img class="history-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
+        : `<svg class="history-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
+      }
+      <div class="history-info">
+        <div class="history-title">${highlightText(entry.title || entry.url, readingListQuery)}</div>
+        <div class="history-url">${highlightText(entry.url, readingListQuery)}</div>
+      </div>
+      <div class="reading-list-actions">
+        <button class="action-btn-sm toggle-read" title="${entry.hasBeenRead ? '未読にする' : '既読にする'}">
+          ${entry.hasBeenRead
+        ? '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>'
+        : '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>'
+      }
+        </button>
+        <button class="action-btn-sm remove-entry" title="削除">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </button>
+      </div>
+    `;
+
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      chrome.tabs.create({ url: entry.url });
+    });
+
+    el.querySelector('.toggle-read').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await chrome.readingList.updateEntry({
+          url: entry.url,
+          hasBeenRead: !entry.hasBeenRead
+        });
+        loadReadingList();
+      } catch (err) {
+        console.error('Failed to update reading list entry', err);
+      }
+    });
+
+    el.querySelector('.remove-entry').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await chrome.readingList.removeEntry({ url: entry.url });
+        loadReadingList();
+      } catch (err) {
+        console.error('Failed to remove reading list entry', err);
+      }
+    });
+
+    container.appendChild(el);
+  });
+}
+
+// 検索
+document.getElementById('reading-list-search').addEventListener('input', (e) => {
+  clearTimeout(readingListSearchTimeout);
+  readingListQuery = e.target.value.trim();
+  readingListSearchTimeout = setTimeout(() => {
+    loadReadingList();
+  }, 200);
+});
+
+// リーディングリスト更新の監視
+if (chrome.readingList) {
+  const onRLChange = () => {
+    if (document.getElementById('panel-readingList').classList.contains('active')) {
+      loadReadingList();
+    }
+  };
+  chrome.readingList.onEntryAdded?.addListener(onRLChange);
+  chrome.readingList.onEntryRemoved?.addListener(onRLChange);
+  chrome.readingList.onEntryUpdated?.addListener(onRLChange);
+}
 
 // ===== バックグラウンドからのメッセージ受信 =====
 chrome.runtime.onMessage.addListener((message) => {

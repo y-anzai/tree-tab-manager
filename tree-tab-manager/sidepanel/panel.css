@@ -916,6 +916,52 @@ body.mode-mini .header-title-text {
   white-space: nowrap;
 }
 
+/* ===== リーディングリスト ===== */
+.reading-list-item.read {
+  opacity: 0.6;
+}
+
+.reading-list-item.unread .history-title {
+  font-weight: 600;
+  color: var(--theme-color);
+}
+
+.reading-list-actions {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.reading-list-item:hover .reading-list-actions {
+  display: flex;
+}
+
+.action-btn-sm {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+  padding: 0;
+}
+
+.action-btn-sm:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.action-btn-sm svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* ===== モーダル ===== */
 .modal {
   position: fixed;

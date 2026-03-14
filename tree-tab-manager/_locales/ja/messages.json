@@ -17,6 +17,9 @@
   "navBookmarks": {
     "message": "お気に入り"
   },
+  "navReadingList": {
+    "message": "後で読む"
+  },
   "navSettings": {
     "message": "設定"
   },
@@ -452,6 +455,12 @@
   },
   "actionCollapseAll": {
     "message": "すべて折りたたむ"
+  },
+  "ctxAddToReadingList": {
+    "message": "リーディングリストに追加"
+  },
+  "toastAddedToReadingList": {
+    "message": "リーディングリストに追加しました"
   },
   "actionExpandAll": {
     "message": "すべて展開"

@@ -17,6 +17,9 @@
     "navBookmarks": {
         "message": "Bookmarks"
     },
+    "navReadingList": {
+        "message": "Reading List"
+    },
     "navSettings": {
         "message": "Settings"
     },
@@ -452,6 +455,12 @@
     },
     "actionCollapseAll": {
         "message": "Collapse All"
+    },
+    "ctxAddToReadingList": {
+        "message": "Add to Reading List"
+    },
+    "toastAddedToReadingList": {
+        "message": "Added to Reading List"
     },
     "actionExpandAll": {
         "message": "Expand All"
