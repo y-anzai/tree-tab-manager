@@ -37,7 +37,9 @@ const state = {
   // ユーザー設定
   userSettings: {
     historyRecentlyClosed: false,
-    bookmarkVisitCount: false
+    bookmarkVisitCount: false,
+    themeColor: 'blue',
+    colorScheme: 'auto'
   },
 
   // タブ管理・設定
@@ -89,11 +91,101 @@ function applyDisplayMode(mode) {
   btn.classList.toggle('mode-active-mini', mode === 'mini');
 }
 
+// Preset palette: [accent-hex-dark, accent-hex-light, bg-primary-dark, bg-primary-light]
+const THEME_PRESETS = {
+  blue: { dark: '#89b4fa', light: '#0071e3', bgDark: '#1e1e2e', bgLight: '#f5f5f7' },
+  green: { dark: '#a6e3a1', light: '#34c759', bgDark: '#1e2e1e', bgLight: '#f0fff4' },
+  yellow: { dark: '#f9e2af', light: '#bb8000', bgDark: '#2e2a18', bgLight: '#fffbee' },
+  red: { dark: '#f38ba8', light: '#cc2222', bgDark: '#2e1e20', bgLight: '#fff0f1' },
+  purple: { dark: '#cba6f7', light: '#a855f7', bgDark: '#221e2e', bgLight: '#f8f0ff' },
+  pink: { dark: '#f5c2e7', light: '#ff2d55', bgDark: '#2e1e28', bgLight: '#fff0f8' },
+};
+
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1, 3), 16) / 255;
+  let g = parseInt(hex.slice(3, 5), 16) / 255;
+  let b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+}
+
+function applyThemeColor(colorOrHex) {
+  state.userSettings.themeColor = colorOrHex;
+  const isDark = document.body.getAttribute('data-color-scheme') !== 'light';
+
+  let accentHex;
+  if (THEME_PRESETS[colorOrHex]) {
+    const p = THEME_PRESETS[colorOrHex];
+    accentHex = isDark ? p.dark : p.light;
+  } else {
+    accentHex = colorOrHex;
+  }
+
+  const [h, s] = hexToHsl(accentHex);
+
+  // Derive bg tones from theme hue
+  // Light mode: Lower luminosity slightly and keep some saturation to make tint visible
+  const bg = isDark ? [
+    hslToHex(h, Math.min(s, 35), 14),
+    hslToHex(h, Math.min(s, 30), 18),
+    hslToHex(h, Math.min(s, 28), 22),
+    hslToHex(h, Math.min(s, 25), 27),
+    hslToHex(h, Math.min(s, 22), 33),
+  ] : [
+    hslToHex(h, Math.min(s, 25), 97), // primary (very light tint)
+    hslToHex(h, Math.min(s, 22), 93), // secondary
+    hslToHex(h, Math.min(s, 20), 88), // tertiary
+    hslToHex(h, Math.min(s, 18), 82), // hover
+    hslToHex(h, Math.min(s, 16), 75), // active
+  ];
+
+  // Apply to both html and body to ensure specificity over CSS [data-color-scheme="light"]
+  [document.documentElement, document.body].forEach(el => {
+    el.style.setProperty('--theme-color', accentHex);
+    el.style.setProperty('--bg-primary', bg[0]);
+    el.style.setProperty('--bg-secondary', bg[1]);
+    el.style.setProperty('--bg-tertiary', bg[2]);
+    el.style.setProperty('--bg-hover', bg[3]);
+    el.style.setProperty('--bg-active', bg[4]);
+  });
+}
+
 // ===== 外観モード（ダーク/ライト）自動切り替え =====
 function applyColorScheme() {
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const mode = state.userSettings.colorScheme || 'auto';
+  let isDark;
+
+  if (mode === 'auto') {
+    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } else {
+    isDark = (mode === 'dark');
+  }
+
   document.documentElement.setAttribute('data-color-scheme', isDark ? 'dark' : 'light');
   document.body.setAttribute('data-color-scheme', isDark ? 'dark' : 'light');
+
+  if (state.userSettings.themeColor) {
+    applyThemeColor(state.userSettings.themeColor);
+  }
 }
 
 // 初期化時に外観モードを適用
@@ -219,6 +311,8 @@ function getDefaultFavicon() {
 }
 
 // ===== ユーザー設定管理 =====
+
+
 function loadUserSettings() {
   try {
     const saved = localStorage.getItem('ttm-user-settings');
@@ -226,6 +320,15 @@ function loadUserSettings() {
       state.userSettings = { ...state.userSettings, ...JSON.parse(saved) };
     }
   } catch (e) { }
+  applyColorScheme();
+}
+
+let saveTimeout = null;
+function saveUserSettingsDebounced() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveUserSettings();
+  }, 500);
 }
 
 function saveUserSettings() {
@@ -400,7 +503,44 @@ function renderSettingsPanel() {
     list.appendChild(item);
   });
 
-  // その他の設定
+  // その他の設定 - テーマカラー スウォッチ
+  function updateSwatchSelection(current) {
+    document.querySelectorAll('.color-swatch[data-color]').forEach(sw => {
+      sw.classList.toggle('selected', sw.dataset.color === current);
+    });
+    const customSwatch = document.querySelector('.color-swatch-custom');
+    if (customSwatch) {
+      const isCustom = current && current.startsWith('#') && !THEME_PRESETS[current];
+      customSwatch.classList.toggle('selected', isCustom);
+      if (isCustom) {
+        const inp = document.getElementById('setting-theme-custom');
+        if (inp) inp.value = current;
+      }
+    }
+  }
+
+  document.querySelectorAll('.color-swatch[data-color]').forEach(sw => {
+    sw.onclick = () => {
+      applyThemeColor(sw.dataset.color);
+      updateSwatchSelection(sw.dataset.color);
+      saveUserSettings(); // Clicking a swatch is a single action, save immediately
+    };
+  });
+
+  const customInput = document.getElementById('setting-theme-custom');
+  if (customInput) {
+    customInput.oninput = () => {
+      applyThemeColor(customInput.value);
+      updateSwatchSelection(customInput.value);
+      saveUserSettingsDebounced(); // Use debounced save during dragging
+    };
+    customInput.onchange = () => {
+      saveUserSettings(); // Save final value on change
+    };
+  }
+
+  updateSwatchSelection(state.userSettings.themeColor || 'blue');
+
   const cbHistory = document.getElementById('setting-history-recent');
   if (cbHistory) {
     cbHistory.checked = state.userSettings.historyRecentlyClosed;
@@ -408,6 +548,16 @@ function renderSettingsPanel() {
       state.userSettings.historyRecentlyClosed = e.target.checked;
       saveUserSettings();
       if (document.getElementById('panel-history').classList.contains('active')) loadHistory();
+    };
+  }
+
+  const selColorScheme = document.getElementById('setting-color-scheme');
+  if (selColorScheme) {
+    selColorScheme.value = state.userSettings.colorScheme || 'auto';
+    selColorScheme.onchange = (e) => {
+      state.userSettings.colorScheme = e.target.value;
+      saveUserSettings();
+      applyColorScheme();
     };
   }
 
@@ -2130,15 +2280,46 @@ function countBookmarks(nodes) {
   return count;
 }
 
-// ソートボタン
+// ソートボタン機能
+function updateVisitCountToggleBtn() {
+  const toggleBtn = document.getElementById('btn-toggle-visit-count');
+  if (!toggleBtn) return;
+  if (state.bookmarkSortMode === 'most-visited') {
+    toggleBtn.classList.remove('hidden');
+    if (state.userSettings.bookmarkVisitCount) {
+      toggleBtn.style.color = "var(--theme-color)";
+      toggleBtn.style.background = "color-mix(in srgb, var(--theme-color) 12%, transparent)";
+    } else {
+      toggleBtn.style.color = "var(--text-muted)";
+      toggleBtn.style.background = "var(--bg-tertiary)";
+    }
+  } else {
+    toggleBtn.classList.add('hidden');
+  }
+}
+
 document.querySelectorAll('.sort-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.bookmarkSortMode = btn.dataset.sort;
+    updateVisitCountToggleBtn();
     renderBookmarks();
   });
 });
+
+const vcToggle = document.getElementById('btn-toggle-visit-count');
+if (vcToggle) {
+  vcToggle.addEventListener('click', () => {
+    state.userSettings.bookmarkVisitCount = !state.userSettings.bookmarkVisitCount;
+    saveUserSettings();
+    updateVisitCountToggleBtn();
+    const cbBookmark = document.getElementById('setting-bookmark-visit');
+    if (cbBookmark) cbBookmark.checked = state.userSettings.bookmarkVisitCount;
+    renderBookmarks();
+  });
+}
+updateVisitCountToggleBtn();
 
 // ブックマーク検索
 document.getElementById('bookmark-search').addEventListener('input', (e) => {

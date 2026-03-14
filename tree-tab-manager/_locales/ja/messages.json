@@ -5,9 +5,6 @@
   "extDesc": {
     "message": "タブをツリー形式で管理するサイドバー拡張機能"
   },
-  "openContextMenu": {
-    "message": "Tree Tab Manager を開く"
-  },
   "navTabs": {
     "message": "タブ"
   },
@@ -375,11 +372,29 @@
   "settingsTabDisplayMode": {
     "message": "タブの表示モード"
   },
+  "settingsColorScheme": {
+    "message": "外観（ダーク/ライト）"
+  },
+  "schemeSystem": {
+    "message": "システム設定"
+  },
+  "schemeLight": {
+    "message": "ライト"
+  },
+  "schemeDark": {
+    "message": "ダーク"
+  },
   "settingsHistoryRecentlyClosed": {
     "message": "履歴: 最近閉じたタブを表示"
   },
   "settingsBookmarkVisitCount": {
     "message": "お気に入り: 頻度順で回数を表示"
+  },
+  "settingsThemeColor": {
+    "message": "テーマカラー"
+  },
+  "toggleVisitCount": {
+    "message": "訪問回数を表示/非表示"
   },
   "modeFull": {
     "message": "標準"

@@ -23,6 +23,7 @@
   --accent-red: #f38ba8;
   --accent-purple: #cba6f7;
   --accent-pink: #f5c2e7;
+  --theme-color: var(--accent-blue);
   --border: #45475a;
   --shadow: rgba(0, 0, 0, 0.4);
   --tab-height: 32px;
@@ -49,6 +50,7 @@
   --accent-red: #ff3b30;
   --accent-purple: #a855f7;
   --accent-pink: #ff2d55;
+  --theme-color: var(--accent-blue);
   --border: #d5d5d7;
   --shadow: rgba(0, 0, 0, 0.1);
 }
@@ -90,7 +92,7 @@ body {
   gap: 8px;
   font-weight: 600;
   font-size: 13px;
-  color: var(--accent-blue);
+  color: var(--theme-color);
 }
 
 .header-icon {
@@ -139,8 +141,8 @@ body.mode-mini .header-title-text {
 }
 
 .tab-btn.active {
-  color: var(--accent-blue);
-  border-bottom-color: var(--accent-blue);
+  color: var(--theme-color);
+  border-bottom-color: var(--theme-color);
 }
 
 /* ===== パネル ===== */
@@ -203,9 +205,9 @@ body.mode-mini .header-title-text {
 }
 
 .toolbar-btn.primary {
-  background: var(--accent-blue);
+  background: var(--theme-color);
   color: var(--bg-primary);
-  border-color: var(--accent-blue);
+  border-color: var(--theme-color);
   font-weight: 500;
 }
 
@@ -270,7 +272,7 @@ body.mode-mini .header-title-text {
   top: 4px;
   bottom: 4px;
   width: 2px;
-  background: var(--accent-blue);
+  background: var(--theme-color);
   border-radius: 1px;
 }
 
@@ -440,21 +442,21 @@ body.mode-mini .header-title-text {
 /* 折りたたみ時は少し目立たせる */
 .tab-toggle.collapsed+img~.tab-info+.desc-badge,
 .tab-toggle.collapsed+span~.tab-info+.desc-badge {
-  background: rgba(137, 180, 250, 0.15);
-  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--theme-color) 15%, transparent);
+  color: var(--theme-color);
 }
 
 /* アクティブタブのバッジ */
 .tab-item.active-tab .desc-badge {
-  background: rgba(137, 180, 250, 0.2);
-  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--theme-color) 20%, transparent);
+  color: var(--theme-color);
 }
 
 /* 固定タブ件数ラベル（ツールバーボタン用） */
 .pinned-count-label {
   font-size: 11px;
   font-weight: 600;
-  background: var(--accent-yellow);
+  background: var(--theme-color);
   color: var(--bg-primary);
   border-radius: 10px;
   padding: 1px 5px;
@@ -547,7 +549,7 @@ body.mode-mini .header-title-text {
 }
 
 .search-input:focus {
-  border-color: var(--accent-blue);
+  border-color: var(--theme-color);
 }
 
 /* ===== リストコンテナ ===== */
@@ -703,9 +705,9 @@ body.mode-mini .header-title-text {
 }
 
 .sort-btn.active {
-  background: var(--accent-blue);
+  background: var(--theme-color);
   color: var(--bg-primary);
-  border-color: var(--accent-blue);
+  border-color: var(--theme-color);
 }
 
 /* ===== ブックマークアイテム ===== */
@@ -731,7 +733,7 @@ body.mode-mini .header-title-text {
 .bookmark-folder-icon {
   width: 14px;
   height: 14px;
-  color: var(--accent-yellow);
+  color: var(--theme-color);
   flex-shrink: 0;
 }
 
@@ -829,7 +831,7 @@ body.mode-mini .header-title-text {
   width: 10px;
   height: 10px;
   flex-shrink: 0;
-  color: var(--accent-yellow);
+  color: var(--theme-color);
 }
 
 .bookmark-url {
@@ -935,7 +937,7 @@ body.mode-mini .header-title-text {
 }
 
 .modal-input:focus {
-  border-color: var(--accent-blue);
+  border-color: var(--theme-color);
 }
 
 .modal-footer {
@@ -958,9 +960,9 @@ body.mode-mini .header-title-text {
 }
 
 .btn-primary {
-  background: var(--accent-blue);
+  background: var(--theme-color);
   color: var(--bg-primary);
-  border-color: var(--accent-blue);
+  border-color: var(--theme-color);
 }
 
 .btn-primary:hover {
@@ -1017,7 +1019,7 @@ body.mode-mini .header-title-text {
 .session-icon svg {
   width: 16px;
   height: 16px;
-  color: var(--accent-blue);
+  color: var(--theme-color);
 }
 
 .session-info {
@@ -1243,7 +1245,7 @@ body.mode-mini .header-title-text {
   left: 8px;
   right: 8px;
   height: 2px;
-  background: var(--accent-blue);
+  background: var(--theme-color);
   border-radius: 1px;
   z-index: 10;
 }
@@ -1255,14 +1257,14 @@ body.mode-mini .header-title-text {
   left: 8px;
   right: 8px;
   height: 2px;
-  background: var(--accent-blue);
+  background: var(--theme-color);
   border-radius: 1px;
   z-index: 10;
 }
 
 .tab-item.drag-over-inside {
-  background: rgba(137, 180, 250, 0.15) !important;
-  outline: 1px solid var(--accent-blue);
+  background: color-mix(in srgb, var(--theme-color) 15%, transparent) !important;
+  outline: 1px solid var(--theme-color);
   outline-offset: -1px;
 }
 
@@ -1272,8 +1274,8 @@ body.mode-mini .header-title-text {
 
 /* ===== 検索ハイライト ===== */
 .highlight {
-  background: rgba(249, 226, 175, 0.3);
-  color: var(--accent-yellow);
+  background: color-mix(in srgb, var(--theme-color) 30%, transparent);
+  color: var(--theme-color);
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -1284,7 +1286,7 @@ body.mode-mini .header-title-text {
   width: 14px;
   height: 14px;
   border: 2px solid var(--border);
-  border-top-color: var(--accent-blue);
+  border-top-color: var(--theme-color);
   border-radius: 50%;
   animation: spin 600ms linear infinite;
   flex-shrink: 0;
@@ -1411,12 +1413,12 @@ body.mode-mini .pinned-count-label {
 /* ─── 表示モードボタン：現在のモードに応じたアクセントカラー ─── */
 .toolbar-btn.mode-active-compact,
 .toolbar-btn.mode-active-mini {
-  color: var(--accent-blue);
+  color: var(--theme-color);
 }
 
 .toolbar-btn.sort-mode-active {
-  color: var(--accent-blue);
-  background: rgba(137, 180, 250, 0.12);
+  color: var(--theme-color);
+  background: color-mix(in srgb, var(--theme-color) 12%, transparent);
 }
 
 /* ===== 親タブと子タブのスタイリング ===== */
@@ -1425,19 +1427,19 @@ body.mode-mini .pinned-count-label {
 }
 
 .tab-item.has-children .tab-toggle {
-  color: var(--accent-blue);
+  color: var(--theme-color);
 }
 
 /* 親タブのドラッグ時のスタイル */
 .tab-item.selecting-parent {
-  outline: 2px dashed var(--accent-blue);
+  outline: 2px dashed var(--theme-color);
   outline-offset: -1px;
-  background: rgba(137, 180, 250, 0.1);
+  background: color-mix(in srgb, var(--theme-color) 10%, transparent);
 }
 
 /* ツリーごと削除ボタン */
 .close-tree-btn {
-  color: var(--accent-yellow) !important;
+  color: var(--theme-color) !important;
 }
 
 .close-tree-btn:hover {
@@ -1710,16 +1712,16 @@ body.mode-mini .pinned-count-label {
 .settings-checkbox {
   width: 16px;
   height: 16px;
-  accent-color: var(--accent-blue);
+  accent-color: var(--theme-color);
   cursor: pointer;
 }
 
 .settings-item.drag-over-above {
-  border-top: 2px solid var(--accent-blue);
+  border-top: 2px solid var(--theme-color);
 }
 
 .settings-item.drag-over-below {
-  border-bottom: 2px solid var(--accent-blue);
+  border-bottom: 2px solid var(--theme-color);
 }
 
 .settings-divider {
@@ -1758,5 +1760,42 @@ body.mode-mini .pinned-count-label {
 }
 
 .settings-select:focus {
-  border-color: var(--accent-blue);
+  border-color: var(--theme-color);
+}
+
+/* ===== テーマカラー スウォッチ ===== */
+.theme-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px var(--text-muted);
+}
+
+.color-swatch.selected {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-color) 50%, transparent);
+  transform: scale(1.1);
+}
+
+.color-swatch-custom {
+  background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+  font-size: 14px;
 }

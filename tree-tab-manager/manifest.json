@@ -12,10 +12,8 @@
     "storage",
     "sessions",
     "sidePanel",
-    "contextMenus"
-  ],
-  "host_permissions": [
-    "<all_urls>"
+    "sessions",
+    "sidePanel"
   ],
   "side_panel": {
     "default_path": "sidepanel/index.html"

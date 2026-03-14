@@ -8,27 +8,11 @@ const tabMetadata = new Map();
 // 拡張機能のインストール/起動時にサイドパネルを設定
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-
-  // コンテキストメニュー（右クリックメニュー）を作成
-  chrome.contextMenus.create({
-    id: "open-side-panel",
-    title: chrome.i18n.getMessage('openContextMenu'),
-    contexts: ["all"]
-  });
 });
 
 // アクションボタンクリックでサイドパネルを開く
 chrome.action.onClicked.addListener((tab) => {
   chrome.sidePanel.open({ windowId: tab.windowId });
-});
-
-// コンテキストメニューのクリックイベントをリッスン
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "open-side-panel") {
-    // ChromeのサイドパネルAPIはバックグラウンドからの「閉じる」機能を直接サポートしていないため
-    // 常に「開く（またはフォーカスする）」動作になる
-    chrome.sidePanel.open({ windowId: tab.windowId });
-  }
 });
 
 // タブ作成時に親子関係を記録

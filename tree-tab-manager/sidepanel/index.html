@@ -179,6 +179,32 @@
       <h3 class="settings-subtitle" data-i18n="settingsOtherTitle">その他の設定</h3>
 
       <div class="settings-list" id="other-settings-list">
+        <div class="settings-item-normal" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+          <div class="settings-item-label" data-i18n="settingsThemeColor">テーマカラー</div>
+          <div class="theme-color-swatches" id="theme-color-swatches">
+            <button class="color-swatch" data-color="blue" style="background:#89b4fa" title="Blue"></button>
+            <button class="color-swatch" data-color="green" style="background:#a6e3a1" title="Green"></button>
+            <button class="color-swatch" data-color="yellow" style="background:#f9e2af" title="Yellow"></button>
+            <button class="color-swatch" data-color="red" style="background:#f38ba8" title="Red"></button>
+            <button class="color-swatch" data-color="purple" style="background:#cba6f7" title="Purple"></button>
+            <button class="color-swatch" data-color="pink" style="background:#f5c2e7" title="Pink"></button>
+            <label class="color-swatch color-swatch-custom" title="Custom color"
+              style="cursor:pointer; overflow:hidden; position:relative;">
+              <span style="font-size:16px; line-height:1; pointer-events:none;">🎨</span>
+              <input type="color" id="setting-theme-custom"
+                style="opacity:0; position:absolute; inset:0; width:100%; height:100%; cursor:pointer; border:none; padding:0;">
+            </label>
+          </div>
+        </div>
+        <label class="settings-item-normal">
+          <div class="settings-item-label" data-i18n="settingsColorScheme">外観モード</div>
+          <select id="setting-color-scheme" class="settings-select">
+            <option value="auto" data-i18n="schemeSystem">システム設定</option>
+            <option value="light" data-i18n="schemeLight">ライト</option>
+            <option value="dark" data-i18n="schemeDark">ダーク</option>
+          </select>
+        </label>
+
         <label class="settings-item-normal">
           <div class="settings-item-label" data-i18n="settingsTabDisplayMode">タブの表示モード</div>
           <select id="setting-display-mode" class="settings-select">

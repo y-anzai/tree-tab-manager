@@ -5,9 +5,6 @@
     "extDesc": {
         "message": "Sidebar extension for managing tabs in a tree structure"
     },
-    "openContextMenu": {
-        "message": "Open Tree Tab Manager"
-    },
     "navTabs": {
         "message": "Tabs"
     },
@@ -375,11 +372,29 @@
     "settingsTabDisplayMode": {
         "message": "Tab Display Mode"
     },
+    "settingsColorScheme": {
+        "message": "Appearance"
+    },
+    "schemeSystem": {
+        "message": "System Settings"
+    },
+    "schemeLight": {
+        "message": "Light"
+    },
+    "schemeDark": {
+        "message": "Dark"
+    },
     "settingsHistoryRecentlyClosed": {
         "message": "History: Show recently closed tabs"
     },
     "settingsBookmarkVisitCount": {
-        "message": "Bookmarks: Show visit count in Most Visited"
+        "message": "Bookmarks: Show counts in most visited"
+    },
+    "settingsThemeColor": {
+        "message": "Theme Color"
+    },
+    "toggleVisitCount": {
+        "message": "Toggle Visit Count"
     },
     "modeFull": {
         "message": "Full"
