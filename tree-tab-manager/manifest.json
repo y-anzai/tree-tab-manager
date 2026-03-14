@@ -10,7 +10,8 @@
     "bookmarks",
     "storage",
     "sessions",
-    "sidePanel"
+    "sidePanel",
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"

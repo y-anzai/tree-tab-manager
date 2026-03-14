@@ -56,14 +56,14 @@ function applyDisplayMode(mode) {
   DISPLAY_MODES.forEach(m => document.body.classList.remove(`mode-${m}`));
   document.body.classList.add(`mode-${mode}`);
   state.displayMode = mode;
-  try { localStorage.setItem('ttm-displayMode', mode); } catch {}
+  try { localStorage.setItem('ttm-displayMode', mode); } catch { }
 
   const btn = document.getElementById('btn-display-mode');
   if (!btn) return;
   btn.innerHTML = MODE_ICONS[mode];
   btn.title = `表示モード: ${MODE_LABELS[mode]}（クリックで切替）`;
   btn.classList.toggle('mode-active-compact', mode === 'compact');
-  btn.classList.toggle('mode-active-mini',    mode === 'mini');
+  btn.classList.toggle('mode-active-mini', mode === 'mini');
 }
 
 // ===== 外観モード（ダーク/ライト）自動切り替え =====
@@ -88,7 +88,7 @@ state.displayMode = (() => {
 applyDisplayMode(state.displayMode);
 
 document.getElementById('btn-display-mode').addEventListener('click', () => {
-  const idx  = DISPLAY_MODES.indexOf(state.displayMode);
+  const idx = DISPLAY_MODES.indexOf(state.displayMode);
   const next = DISPLAY_MODES[(idx + 1) % DISPLAY_MODES.length];
   applyDisplayMode(next);
 });
@@ -98,7 +98,7 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
 
 function applySortMode(mode) {
   state.tabSortMode = mode;
-  try { localStorage.setItem('ttm-tabSortMode', mode); } catch {}
+  try { localStorage.setItem('ttm-tabSortMode', mode); } catch { }
   const btn = document.getElementById('btn-sort-mode');
   if (!btn) return;
   btn.classList.toggle('sort-mode-active', mode === 'recent');
@@ -342,14 +342,14 @@ function buildTabTree(tabs, parents) {
 
 // Chrome タブグループの利用可能カラー
 const GROUP_COLORS = [
-  { name: 'grey',   label: 'グレー'   },
-  { name: 'blue',   label: 'ブルー'   },
-  { name: 'red',    label: 'レッド'   },
+  { name: 'grey', label: 'グレー' },
+  { name: 'blue', label: 'ブルー' },
+  { name: 'red', label: 'レッド' },
   { name: 'yellow', label: 'イエロー' },
-  { name: 'green',  label: 'グリーン' },
-  { name: 'pink',   label: 'ピンク'   },
+  { name: 'green', label: 'グリーン' },
+  { name: 'pink', label: 'ピンク' },
   { name: 'purple', label: 'パープル' },
-  { name: 'cyan',   label: 'シアン'   },
+  { name: 'cyan', label: 'シアン' },
   { name: 'orange', label: 'オレンジ' },
 ];
 
@@ -663,13 +663,13 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
         </svg>
       </button>` : ''}
       ${hasChildren ? (() => {
-        const total = countDescendants(tab);
-        return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="このタブと子タブをすべて閉じる（${total + 1}個）">
+      const total = countDescendants(tab);
+      return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="このタブと子タブをすべて閉じる（${total + 1}個）">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
           </svg>
         </button>`;
-      })() : ''}
+    })() : ''}
       <button class="tab-action-btn close-btn" data-action="close" title="閉じる">
         <svg viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
@@ -759,19 +759,19 @@ function showTabContextMenu(x, y, tab) {
   const isRecentMode = state.tabSortMode === 'recent';
 
   const ICON = {
-    pin:    `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>`,
-    child:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>`,
-    ungroup:`<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
-    tag:    `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>`,
-    down:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
-    lift:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>`,
-    trash:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
-    left:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>`,
+    pin: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>`,
+    child: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>`,
+    ungroup: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    tag: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>`,
+    down: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    lift: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>`,
+    trash: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+    left: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>`,
     domain: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v1h1a2 2 0 012 2v5a2 2 0 01-2 2H4a2 2 0 01-2-2v-5a2 2 0 012-2h1zm8-2v1H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>`,
-    up:     `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>`,
+    up: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>`,
     pencil: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
-    copy:   `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/><path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`,
-    close:  `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+    copy: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/><path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`,
+    close: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
   };
 
   const menuItems = [
@@ -901,7 +901,7 @@ function showTabContextMenu(x, y, tab) {
           action: () => aggregateSameDomain(tab.id, sameDomainTabs)
         });
       }
-    } catch {}
+    } catch { }
 
     // 1つ上の階層へ移動
     const parentTabId = state.tabParents[tab.id];
@@ -1064,7 +1064,7 @@ async function editTabName(tab) {
     try {
       localStorage.removeItem(`ttm-custom-name-${tab.id}`);
       localStorage.removeItem(`ttm-custom-name-url-${tab.url}`);
-    } catch {}
+    } catch { }
     showToast('タブ名をリセットしました', 'success');
   } else {
     // 新しい名前を設定
@@ -1073,7 +1073,7 @@ async function editTabName(tab) {
     try {
       localStorage.setItem(`ttm-custom-name-${tab.id}`, newName.trim());
       localStorage.setItem(`ttm-custom-name-url-${tab.url}`, newName.trim());
-    } catch {}
+    } catch { }
     showToast('タブ名を更新しました', 'success');
   }
 
@@ -1099,7 +1099,7 @@ async function activateTab(tabId, windowId) {
   try {
     // 最近開いた時刻を記録（最近開いた順ソート用）
     state.tabActivationTime[tabId] = Date.now();
-    try { localStorage.setItem(`ttm-tab-activation-${tabId}`, state.tabActivationTime[tabId]); } catch {}
+    try { localStorage.setItem(`ttm-tab-activation-${tabId}`, state.tabActivationTime[tabId]); } catch { }
 
     await sendMessage('ACTIVATE_TAB', { tabId, windowId });
   } catch (e) {
@@ -1294,7 +1294,7 @@ async function loadTabs() {
     try {
       const stored = localStorage.getItem(`ttm-tab-activation-${tab.id}`);
       if (stored) state.tabActivationTime[tab.id] = parseInt(stored, 10);
-    } catch {}
+    } catch { }
   });
 
   // カスタム名を復元（tabId経由）
@@ -1302,7 +1302,7 @@ async function loadTabs() {
     try {
       const customName = localStorage.getItem(`ttm-custom-name-${tab.id}`);
       if (customName) state.customTabNames[tab.id] = customName;
-    } catch {}
+    } catch { }
   });
 
   // カスタム名を復元（URL経由：同じURLの再訪時用）
@@ -1316,7 +1316,7 @@ async function loadTabs() {
           state.customTabNames[tab.id] = customNameByUrl;
         }
       }
-    } catch {}
+    } catch { }
   });
 
   // グループ情報を取得（タブ一覧の groupId を直接利用して効率化）
@@ -1690,6 +1690,12 @@ function createBookmarkItem(item, query = '') {
     }
     <div class="bookmark-info">
       <div class="bookmark-title">${title}</div>
+      ${(state.bookmarkSortMode !== 'tree' && item.folderPath) ? `<div class="bookmark-path" title="${escapeHtml(item.folderPath)}">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+        </svg>
+        <span>${escapeHtml(item.folderPath)}</span>
+      </div>` : ''}
       <div class="bookmark-url">${escapeHtml(item.url)}</div>
     </div>
     ${dateStr ? `<div class="bookmark-date">${escapeHtml(dateStr)}</div>` : ''}
@@ -1713,6 +1719,45 @@ function createBookmarkItem(item, query = '') {
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/></svg>`,
         action: () => {
           navigator.clipboard.writeText(item.url).then(() => showToast('URLをコピーしました', 'success'));
+        }
+      },
+      { separator: true },
+      {
+        label: '編集',
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
+        action: async () => {
+          const newTitle = prompt('新しいタイトルを入力してください:', item.title);
+          if (newTitle === null) return;
+          const newUrl = prompt('新しいURLを入力してください:', item.url);
+          if (newUrl === null) return;
+
+          try {
+            await chrome.bookmarks.update(item.id, { title: newTitle, url: newUrl });
+            showToast('ブックマークを更新しました', 'success');
+            state.bookmarkTree = null;
+            loadBookmarks();
+          } catch (err) {
+            console.error('Failed to update bookmark', err);
+            showToast('更新に失敗しました', 'error');
+          }
+        }
+      },
+      {
+        label: '削除',
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+        danger: true,
+        action: async () => {
+          if (confirm(`「${item.title || item.url}」を削除しますか？`)) {
+            try {
+              await chrome.bookmarks.remove(item.id);
+              showToast('ブックマークを削除しました', 'success');
+              state.bookmarkTree = null;
+              loadBookmarks();
+            } catch (err) {
+              console.error('Failed to remove bookmark', err);
+              showToast('削除に失敗しました', 'error');
+            }
+          }
         }
       }
     ]);

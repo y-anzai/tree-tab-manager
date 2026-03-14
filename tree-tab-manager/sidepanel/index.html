@@ -18,7 +18,7 @@
   </header>
 
   <!-- タブナビゲーション -->
-  <nav class="tab-nav">
+  <nav class="tab-nav" id="main-nav">
     <button class="tab-btn active" data-panel="tabs">
       <svg viewBox="0 0 20 20" fill="currentColor">
         <path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/>
@@ -129,6 +129,17 @@
     </div>
     <div class="list-container" id="bookmark-list">
       <div class="loading">読み込み中...</div>
+    </div>
+  </div>
+
+  <!-- 設定パネル -->
+  <div id="panel-settings" class="panel">
+    <div class="settings-container">
+      <h2 class="settings-title">タブの表示設定</h2>
+      <p class="settings-desc">ドラッグ＆ドロップで並び替え、チェックボックスで表示/非表示を切り替えます。</p>
+      <div id="tab-visibility-list" class="settings-list">
+        <!-- JSで動的に生成 -->
+      </div>
     </div>
   </div>
 
