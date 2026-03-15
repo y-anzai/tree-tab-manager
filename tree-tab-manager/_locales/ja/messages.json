@@ -492,6 +492,15 @@
   "settingsOtherTitle": {
     "message": "その他の設定"
   },
+  "settingsInteractionMode": {
+    "message": "パネルの表示方法"
+  },
+  "interactionSidepanel": {
+    "message": "サイドパネル"
+  },
+  "interactionPopup": {
+    "message": "ポップアップ"
+  },
   "settingsTabDisplayMode": {
     "message": "タブの表示モード"
   },

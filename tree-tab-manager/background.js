@@ -167,13 +167,23 @@ setTimeout(fetchGoogleTasks, 5000);
 loadTreeData();
 
 // 拡張機能のインストール/起動時にサイドパネルを設定
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+chrome.runtime.onInstalled.addListener(async () => {
+  const data = await chrome.storage.local.get('ttm-user-settings');
+  const settings = data['ttm-user-settings'] || {};
+  const mode = settings.interactionMode || 'sidepanel';
+
+  if (mode === 'popup') {
+    chrome.action.setPopup({ popup: 'sidepanel/popup.html' });
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => { });
+  } else {
+    chrome.action.setPopup({ popup: '' });
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
+  }
 });
 
-// アクションボタンクリックでサイドパネルを開く
+// アクションボタンクリックでサイドパネルを開く（ポップアップ設定時は動かない）
 chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ windowId: tab.windowId });
+  chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => { });
 });
 
 // コマンドリスナー（ショートカットキー）

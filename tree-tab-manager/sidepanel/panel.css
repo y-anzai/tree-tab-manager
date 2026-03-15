@@ -269,6 +269,11 @@ body.mode-mini .header-title-text {
   /* 万が一の溢れを防止 */
 }
 
+.tab-item.search-match {
+  background: color-mix(in srgb, var(--theme-color) 12%, transparent) !important;
+  border: 1px dashed color-mix(in srgb, var(--theme-color) 40%, transparent);
+}
+
 /* 子タブに入った時のシュバッと演出 */
 .tab-item.animating-child {
   animation: subatto-in 0.4s cubic-bezier(0.19, 1, 0.22, 1);
@@ -1932,10 +1937,6 @@ body.mode-mini .pinned-count-label {
   padding: 1px 5px;
   border-radius: 10px;
   flex-shrink: 0;
-}
-
-.tab-group-children {
-  /* 展開時はデフォルト表示 */
 }
 
 .tab-group-children.collapsed {

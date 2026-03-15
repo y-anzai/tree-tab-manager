@@ -489,6 +489,15 @@
     "settingsOtherTitle": {
         "message": "Other Settings"
     },
+    "settingsInteractionMode": {
+        "message": "Panel Display Mode"
+    },
+    "interactionSidepanel": {
+        "message": "Side Panel"
+    },
+    "interactionPopup": {
+        "message": "Popup"
+    },
     "settingsTabDisplayMode": {
         "message": "Tab Display Mode"
     },

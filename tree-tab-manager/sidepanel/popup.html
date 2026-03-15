@@ -6,9 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-i18n="extName">Tree Tab Manager</title>
   <link rel="stylesheet" href="panel.css">
+  <style>
+    body.is-popup {
+      width: 400px;
+      height: 600px;
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
 </head>
 
-<body>
+<body class="is-popup">
   <!-- ヘッダー（タイトル重複防止のため非表示設定） -->
   <header class="header" style="display: none;">
     <div class="header-title">
