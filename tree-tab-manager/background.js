@@ -16,45 +16,96 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 // コマンドリスナー（ショートカットキー）
-chrome.commands.onCommand.addListener(async (command) => {
-  if (command === 'toggle-mini-tree') {
-    // アクティブタブにトグルメッセージを送信
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!activeTab) return;
-    // chrome:// や about: ページはコンテンツスクリプト不可
-    if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
-    chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
-  }
-});
+// chrome.commands.onCommand.addListener(async (command) => {
+//   if (command === 'toggle-mini-tree') {
+//     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+//     if (!activeTab) return;
+//     if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
+//     chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
+//   }
+// });
 
 // タブ作成時に親子関係を記録
-chrome.tabs.onCreated.addListener((tab) => {
-  if (tab.openerTabId !== undefined) {
-    tabParentMap.set(tab.id, tab.openerTabId);
+chrome.tabs.onCreated.addListener(async (tab) => {
+  let parentId = tab.openerTabId;
+
+  // リンクを踏んだ場合の親子関係を捕捉するためのヒューリスティック
+  // openerTabId が無い場合、現在同一ウィンドウでアクティブなタブを親候補とする
+  if (parentId === undefined) {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
+      if (activeTab && activeTab.id !== tab.id && activeTab.url && !activeTab.url.startsWith('chrome://')) {
+        parentId = activeTab.id;
+      }
+    } catch (e) {
+      console.error('[TTM] Failed to query active tab for parent heuristic:', e);
+    }
   }
+
+  if (parentId !== undefined) {
+    tabParentMap.set(tab.id, parentId);
+  }
+
   // メタデータ初期化
   tabMetadata.set(tab.id, { collapsed: false });
   // サイドパネルに通知
   notifyPanels({ type: 'TAB_CREATED', tabId: tab.id });
+
+  // ツリーモードなら物理的な並び替えを同期
+  const res = await chrome.storage.local.get('ttm-tab-sort-mode');
+  if (res['ttm-tab-sort-mode'] === 'tree') {
+    await syncPhysicalTabsWithTree();
+  }
 });
 
 // タブ更新時に通知
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl || 'groupId' in changeInfo) {
+    // グループが変更された場合、すべての子孫も同じグループに入れる（ユーザーリクエスト）
+    if ('groupId' in changeInfo) {
+      const descendants = getDescendantIds(tabId);
+      if (descendants.length > 0) {
+        try {
+          if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+            await chrome.tabs.ungroup(descendants);
+          } else {
+            await chrome.tabs.group({
+              groupId: changeInfo.groupId,
+              tabIds: descendants
+            });
+          }
+        } catch (e) {
+          console.error('[TTM] Failed to sync descendant groups:', e);
+        }
+      }
+    }
     notifyPanels({ type: 'TAB_UPDATED', tabId, changeInfo });
   }
 });
 
+// 子孫タブのIDをすべて取得（再帰）
+function getDescendantIds(tabId) {
+  let ids = [];
+  for (const [childId, parentId] of tabParentMap.entries()) {
+    if (parentId === tabId) {
+      ids.push(childId);
+      ids = ids.concat(getDescendantIds(childId));
+    }
+  }
+  return ids;
+}
+
 // タブ削除時に親子関係をクリーンアップ
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  const currentParentId = tabParentMap.get(tabId);
   tabParentMap.delete(tabId);
   tabMetadata.delete(tabId);
+
   // 削除されたタブの子タブの親を削除タブの親に変更（リフト）
   for (const [childId, parentId] of tabParentMap.entries()) {
     if (parentId === tabId) {
-      const grandParent = tabParentMap.get(tabId);
-      if (grandParent !== undefined) {
-        tabParentMap.set(childId, grandParent);
+      if (currentParentId !== undefined) {
+        tabParentMap.set(childId, currentParentId);
       } else {
         tabParentMap.delete(childId);
       }
@@ -162,41 +213,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       deleteSession(message.sessionId).then(() => sendResponse({ success: true }));
       return true;
 
-    case 'GET_MINI_TREE_DATA': {
-      // コンテンツスクリプト用: 現在ウィンドウのタブ一覧 + 親子関係を返す
-      chrome.tabs.query({ currentWindow: true }).then((tabs) => {
-        sendResponse({
-          tabs: tabs.map(t => ({
-            id: t.id,
-            title: t.title,
-            url: t.url,
-            favIconUrl: t.favIconUrl,
-            active: t.active,
-            pinned: t.pinned,
-            windowId: t.windowId,
-            index: t.index
-          })),
-          parents: Object.fromEntries(tabParentMap)
-        });
-      });
-      return true;
-    }
-
-    case 'MINI_TREE_ACTIVATE_TAB':
-      chrome.tabs.update(message.tabId, { active: true })
-        .then(() => chrome.windows.update(message.windowId, { focused: true }))
-        .then(() => sendResponse({ success: true }));
-      return true;
-
-    case 'MINI_TREE_TOGGLE_COLLAPSE':
-      // collapseStateはコンテンツスクリプト側で管理するため confirmだけ
-      sendResponse({ success: true });
-      break;
-
-    case 'MINI_TREE_MOVE_TAB':
-      chrome.tabs.move(message.tabId, { index: message.index })
-        .then(() => sendResponse({ success: true }));
-      return true;
+    /* cases for MINI_TREE deactivated */
+    // case 'GET_MINI_TREE_DATA': ...
+    // case 'MINI_TREE_ACTIVATE_TAB': ...
+    // case 'MINI_TREE_TOGGLE_COLLAPSE': ...
+    // case 'MINI_TREE_MOVE_TAB': ...
 
   }
   return false;
@@ -207,15 +228,10 @@ function notifyPanels(message) {
   chrome.runtime.sendMessage(message).catch(() => {
     // サイドパネルが開いていない場合はエラーを無視
   });
-  // ミニツリーが開いているタブにも通知
-  if (message.type === 'TREE_UPDATED' || message.type === 'TAB_CREATED' || message.type === 'TAB_REMOVED' || message.type === 'TAB_UPDATED' || message.type === 'TAB_ACTIVATED') {
-    chrome.tabs.query({ currentWindow: true }).then(tabs => {
-      tabs.forEach(tab => {
-        if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) return;
-        chrome.tabs.sendMessage(tab.id, { type: 'MINI_TREE_REFRESH', event: message }).catch(() => { });
-      });
-    });
-  }
+  // ミニツリーへの通知は非アクティブ化
+  /*
+  if (message.type === 'TREE_UPDATED' || message.type === 'TAB_CREATED' || ... ) { ... }
+  */
 }
 
 // セッション保存

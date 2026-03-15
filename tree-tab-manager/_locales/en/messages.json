@@ -35,11 +35,20 @@
     "toolbarLoadSession": {
         "message": "Load Session"
     },
+    "toolbarSessions": {
+        "message": "Session Management"
+    },
+    "toolbarTabSelectionAnimation": {
+        "message": "Toggle Selection Animation"
+    },
     "toolbarCollapseAll": {
         "message": "Collapse All"
     },
     "toolbarExpandAll": {
         "message": "Expand All"
+    },
+    "toolbarToggleAll": {
+        "message": "Expand/Collapse All"
     },
     "msgLoading": {
         "message": "Loading..."
@@ -59,6 +68,9 @@
     "sortMostVisited": {
         "message": "Most Visited"
     },
+    "titleUntitled": {
+        "message": "(Untitled)"
+    },
     "sortTree": {
         "message": "Tree"
     },
@@ -70,6 +82,9 @@
     },
     "bookmarkSearchPlaceholder": {
         "message": "Search bookmarks..."
+    },
+    "readingListSearchPlaceholder": {
+        "message": "Search reading list..."
     },
     "settingsTitle": {
         "message": "Tab Display Settings"
@@ -138,6 +153,62 @@
     },
     "toastBookmarkDeleteFailed": {
         "message": "Failed to delete bookmark"
+    },
+    "toastGroupRemoved": {
+        "message": "Removed from group"
+    },
+    "toastGroupRemoveFailed": {
+        "message": "Failed to remove from group"
+    },
+    "toastGroupAdded": {
+        "message": "Added to group"
+    },
+    "toastGroupAddFailed": {
+        "message": "Failed to add to group"
+    },
+    "toastGroupCreated": {
+        "message": "Created new group"
+    },
+    "toastGroupCreateFailed": {
+        "message": "Failed to create group"
+    },
+    "toastGroupUngrouped": {
+        "message": "Ungrouped"
+    },
+    "toastGroupUngroupFailed": {
+        "message": "Failed to ungroup"
+    },
+    "toastColorUpdateFailed": {
+        "message": "Failed to update color"
+    },
+    "toastCancelled": {
+        "message": "Cancelled"
+    },
+    "toastParentSet": {
+        "message": "Parent set"
+    },
+    "toastSelectParent": {
+        "message": "Click a tab to set as parent (Esc to cancel)"
+    },
+    "toastTabMoved": {
+        "message": "Tab moved"
+    },
+    "toastChildTabsMoved": {
+        "message": "Child tabs moved"
+    },
+    "toastNoChildTabs": {
+        "message": "No child tabs"
+    },
+    "toastNoTabsBelow": {
+        "message": "No tabs below"
+    },
+    "toastTabsGroupedCounted": {
+        "message": "Made $1 tabs children",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
     },
     "toastTabNameReset": {
         "message": "Tab name reset"
@@ -210,6 +281,9 @@
     "ctxSelectColor": {
         "message": "Select Color"
     },
+    "ctxColor": {
+        "message": "Color:"
+    },
     "colorGrey": {
         "message": "Grey"
     },
@@ -271,6 +345,15 @@
     "ctxUnpinTab": {
         "message": "Unpin Tab"
     },
+    "ctxPin": {
+        "message": "Pin"
+    },
+    "ctxClose": {
+        "message": "Close"
+    },
+    "ctxCloseOnlyTab": {
+        "message": "Close this tab"
+    },
     "ctxOpenChildTab": {
         "message": "Open as child tab"
     },
@@ -301,6 +384,14 @@
     "emptyTabs": {
         "message": "No tabs found"
     },
+    "pinnedHeader": {
+        "message": "Pinned Tabs ($1)",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
     "emptySessions": {
         "message": "No saved sessions"
     },
@@ -318,6 +409,12 @@
     },
     "emptyBookmarkLoadFail": {
         "message": "Failed to load bookmarks"
+    },
+    "emptyReadingList": {
+        "message": "Reading list is empty"
+    },
+    "emptyReadingListLoadFail": {
+        "message": "Failed to load reading list"
     },
     "timeJustNow": {
         "message": "Just now"
@@ -366,6 +463,23 @@
     },
     "sessionDefaultName": {
         "message": "Session $1",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "groupDefaultName": {
+        "message": "Group"
+    },
+    "sessionText": {
+        "message": "Session"
+    },
+    "tabsText": {
+        "message": "tabs"
+    },
+    "bookmarkCount": {
+        "message": "$1 times",
         "placeholders": {
             "1": {
                 "content": "$1"
@@ -462,6 +576,15 @@
     "toastAddedToReadingList": {
         "message": "Added to Reading List"
     },
+    "toastReadingListAddFailed": {
+        "message": "Failed to add to reading list"
+    },
+    "toastReadingListMarkRead": {
+        "message": "Mark as read"
+    },
+    "toastReadingListMarkUnread": {
+        "message": "Mark as unread"
+    },
     "actionExpandAll": {
         "message": "Expand All"
     },
@@ -497,5 +620,44 @@
     },
     "settingsMiniTreeWidth": {
         "message": "Mini Tree Width"
+    },
+    "toolbarCloseOnSelect": {
+        "message": "Close panel after selecting a tab (ON/OFF)"
+    },
+    "settingsFocusIntensity": {
+        "message": "Focus Effect Intensity"
+    },
+    "focusNone": {
+        "message": "None"
+    },
+    "focusLow": {
+        "message": "Low"
+    },
+    "focusMedium": {
+        "message": "Medium"
+    },
+    "focusHigh": {
+        "message": "High"
+    },
+    "settingsToggleSize": {
+        "message": "Parent tree toggle icon size"
+    },
+    "settingsTabSelectionAnimation": {
+        "message": "Move tab right when selected"
+    },
+    "settingsCloseOnSelect": {
+        "message": "Close side panel after selecting a tab"
+    },
+    "settingsFontSize": {
+        "message": "Tab font size"
+    },
+    "sizeSmall": {
+        "message": "Small"
+    },
+    "sizeMedium": {
+        "message": "Medium"
+    },
+    "sizeLarge": {
+        "message": "Large"
     }
 }

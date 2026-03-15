@@ -22,26 +22,26 @@
 
   <!-- タブナビゲーション -->
   <nav class="tab-nav" id="main-nav">
-    <button class="tab-btn active" data-panel="tabs">
+    <button class="tab-btn active" data-panel="tabs" data-i18n="navTabs">
       <svg viewBox="0 0 20 20" fill="currentColor">
         <path
           d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z" />
       </svg>
-      タブ
+      Tabs
     </button>
-    <button class="tab-btn" data-panel="history">
+    <button class="tab-btn" data-panel="history" data-i18n="navHistory">
       <svg viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd"
           d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
           clip-rule="evenodd" />
       </svg>
-      履歴
+      History
     </button>
-    <button class="tab-btn" data-panel="bookmarks">
+    <button class="tab-btn" data-panel="bookmarks" data-i18n="navBookmarks">
       <svg viewBox="0 0 20 20" fill="currentColor">
         <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
       </svg>
-      お気に入り
+      Bookmarks
     </button>
   </nav>
 
@@ -64,9 +64,22 @@
         </svg>
         <span data-i18n="toolbarNewTab">新しいタブ</span>
       </button>
+      <button class="toolbar-btn" id="btn-toggle-close-on-select" title="選択後にパネルを自動で閉じる"
+        data-i18n-title="toolbarCloseOnSelect">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path
+            d="M3 4a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2H3zm2 3h4v2H5V7zm0 4h4v2H5v-2zM13 13h2v2h-2v-2zm2-2h2v2h-2v-2zm-2-2h2v2h-2V9zm2-2h2v2h-2V7z" />
+        </svg>
+      </button>
+      <button class="toolbar-btn" id="btn-toggle-selection-animation" title="選択時の移動アニメーション切替"
+        data-i18n-title="toolbarTabSelectionAnimation">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path d="M7 5l5 5-5 5M13 5l5 5-5 5" />
+        </svg>
+      </button>
       <div class="toolbar-right">
         <button class="toolbar-btn" id="btn-toggle-mini-tree" title="ミニツリーを表示/非表示"
-          data-i18n-title="toolbarToggleMiniTree">
+          data-i18n-title="toolbarToggleMiniTree" style="display: none;">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd"
               d="M3 4a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm1 1v10h3V5H4zm4 10h7V5H8v10z"
@@ -158,7 +171,8 @@
           d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
           clip-rule="evenodd" />
       </svg>
-      <input type="text" id="reading-list-search" placeholder="リストを検索..." class="search-input">
+      <input type="text" id="reading-list-search" placeholder="Search list..."
+        data-i18n-placeholder="readingListSearchPlaceholder" class="search-input">
     </div>
     <div class="list-container" id="reading-list-container">
       <div class="loading" data-i18n="msgLoading">読み込み中...</div>
@@ -231,7 +245,7 @@
           </select>
         </label>
 
-        <label class="settings-item-normal">
+        <label class="settings-item-normal" style="display: none;">
           <div class="settings-item-label" data-i18n="settingsMiniTreeWidth">ミニツリーの幅</div>
           <div class="settings-item-value"
             style="display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end;">
@@ -242,13 +256,23 @@
         </label>
 
         <label class="settings-item-normal">
-          <div class="settings-item-label" data-i18n="settingsFocusEffect">フォーカス効果の強度</div>
+          <div class="settings-item-label" data-i18n="settingsFocusIntensity">フォーカス効果の強度</div>
           <select id="setting-focus-intensity" class="settings-select">
             <option value="none" data-i18n="focusNone">なし</option>
             <option value="low" data-i18n="focusLow">控えめ</option>
             <option value="medium" data-i18n="focusMedium">標準</option>
             <option value="high" data-i18n="focusHigh">強力</option>
           </select>
+        </label>
+
+        <label class="settings-item-normal">
+          <div class="settings-item-label" data-i18n="settingsCloseOnSelect">タブ選択後に閉じる</div>
+          <input type="checkbox" id="setting-close-on-select" class="settings-checkbox">
+        </label>
+
+        <label class="settings-item-normal">
+          <div class="settings-item-label" data-i18n="settingsTabSelectionAnimation">選択されたタブを右に少し動かす</div>
+          <input type="checkbox" id="setting-tab-selection-animation" class="settings-checkbox">
         </label>
 
         <label class="settings-item-normal">
@@ -259,6 +283,14 @@
             <option value="large" data-i18n="sizeLarge">大</option>
           </select>
         </label>
+
+        <div class="settings-item-vertical">
+          <div class="settings-item-header">
+            <div class="settings-item-label" data-i18n="settingsFontSize">タブの文字サイズ</div>
+            <span id="tab-font-size-value" class="settings-value">12px</span>
+          </div>
+          <input type="range" id="setting-tab-font-size" min="10" max="18" step="1" class="settings-slider">
+        </div>
       </div>
 
       <hr class="settings-divider">
@@ -273,7 +305,7 @@
   <div id="modal-sessions" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 data-i18n="modalSessionsTitle">セッション管理</h3>
+        <h3 data-i18n="toolbarSessions">セッション管理</h3>
         <button class="modal-close" data-modal="modal-sessions">&times;</button>
       </div>
       <div class="modal-body">
