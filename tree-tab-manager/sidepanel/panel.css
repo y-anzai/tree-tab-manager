@@ -204,6 +204,12 @@ body.mode-mini .header-title-text {
   color: var(--text-primary);
 }
 
+.toolbar-btn.active {
+  color: var(--theme-color);
+  background: var(--bg-active);
+  border-color: var(--theme-color);
+}
+
 .toolbar-btn.primary {
   background: var(--theme-color);
   color: var(--bg-primary);
@@ -248,8 +254,10 @@ body.mode-mini .header-title-text {
 .tab-item {
   display: flex;
   align-items: center;
-  height: var(--tab-height);
-  padding-right: 4px;
+  min-height: var(--tab-height);
+  height: auto;
+  padding: 4px;
+  padding-right: 8px;
   cursor: pointer;
   border-radius: var(--radius-sm);
   transition: background var(--transition);
@@ -261,13 +269,163 @@ body.mode-mini .header-title-text {
   /* 万が一の溢れを防止 */
 }
 
-.tab-item:hover .tab-content-wrapper {
+/* 子タブに入った時のシュバッと演出 */
+.tab-item.animating-child {
+  animation: subatto-in 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+  background: color-mix(in srgb, var(--theme-color) 25%, transparent) !important;
+  z-index: 10;
+}
+
+body.disable-selection-animation .tab-item.animating-child {
+  animation: none;
+}
+
+@keyframes subatto-in {
+  0% {
+    transform: translateX(-40px) scaleX(1.5);
+    filter: brightness(2) blur(1px);
+    opacity: 0;
+  }
+
+  60% {
+    transform: translateX(5px) scaleX(0.95);
+    filter: brightness(1.2) blur(0);
+  }
+
+  100% {
+    transform: translateX(0) scaleX(1);
+    filter: brightness(1) blur(0);
+    opacity: 1;
+  }
+}
+
+
+.toggle-all-icon {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-all-icon.expanded {
+  transform: rotate(180deg);
+}
+
+
+.tab-item:hover .tab-content-wrapper,
+.tab-item.active-tab .tab-content-wrapper {
   background: var(--bg-hover);
 }
 
 .tab-item.active-tab .tab-content-wrapper {
+  transform: translateX(4px);
+}
+
+body.disable-selection-animation .tab-item.active-tab .tab-content-wrapper {
+  transform: translateX(0);
+}
+
+body.disable-selection-animation .tab-item,
+body.disable-selection-animation .tab-item * {
+  transition: none !important;
+  animation: none !important;
+}
+
+.tab-item.active-tab .tab-title {
+  color: var(--theme-color);
+  font-weight: 600;
+}
+
+/* 非アクティブ（ブラー）時のフォーカス表示 */
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-item:not(.active-tab),
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-item.active-tab .tab-url,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-item.active-tab .tab-actions,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-item.active-tab .desc-badge,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .header,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-nav,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .toolbar,
+body[data-focus-intensity="low"]:not(.sidepanel-focused) .tab-toggle {
+  opacity: 0.6;
+}
+
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-item:not(.active-tab),
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-item.active-tab .tab-url,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-item.active-tab .tab-actions,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-item.active-tab .desc-badge,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .header,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-nav,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .toolbar,
+body[data-focus-intensity="medium"]:not(.sidepanel-focused) .tab-toggle {
+  opacity: 0.25;
+}
+
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-item:not(.active-tab),
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-item.active-tab .tab-url,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-item.active-tab .tab-actions,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-item.active-tab .desc-badge,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .header,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-nav,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .toolbar,
+body[data-focus-intensity="high"]:not(.sidepanel-focused) .tab-toggle {
+  opacity: 0.05;
+}
+
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-content-wrapper {
+  background: transparent;
+}
+
+body[data-focus-intensity="none"]:not(.sidepanel-focused) .tab-item.active-tab .tab-content-wrapper {
+  background: var(--bg-hover);
+}
+
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-title,
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-favicon,
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-favicon-default,
+body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-pin-icon {
+  opacity: 1;
+}
+
+
+/* ツールバーのピル型グループ */
+.toolbar-pill {
+  display: flex;
+  align-items: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  margin-right: 4px;
+}
+
+.pill-btn {
+  width: 26px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+  padding: 0;
+}
+
+.pill-btn:hover {
+  color: var(--text-primary);
   background: var(--bg-active);
 }
+
+.pill-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pill-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
 
 .tab-content-wrapper {
   display: flex;
@@ -275,12 +433,12 @@ body.mode-mini .header-title-text {
   flex: 1;
   min-width: 0;
   /* 子供の ellipsis を効かせるために必須 */
-  height: min-content;
-  min-height: 28px;
+  height: auto;
+  min-height: calc(var(--tab-height) - 8px);
   border-radius: var(--radius-sm);
   padding: 0 4px;
   margin-left: 2px;
-  transition: background var(--transition);
+  transition: background var(--transition), transform var(--transition);
 }
 
 .tab-item.active-tab::before {
@@ -306,51 +464,23 @@ body.mode-mini .header-title-text {
   font-weight: 500;
 }
 
-/* 子タブのコネクタアイコン */
-.tab-child-connector {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  opacity: 0.6;
-  margin-left: -16px;
-  margin-right: 2px;
+/* 子ツリー */
+.tab-children {
+  overflow: hidden;
+  transition: max-height 200ms ease, opacity 200ms ease;
+  margin-left: 11px;
+  /* トグルの中心にガイド線を合わせる */
+  padding-left: 5px;
+  /* 合計 16px インデント */
+  border-left: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
 }
 
-.tab-child-connector svg {
-  width: 10px;
-  height: 10px;
+.tab-children:hover {
+  border-left-color: var(--theme-color);
 }
 
-/* ドラッグハンドル */
-.tab-drag-handle {
-  width: 12px;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  cursor: grab;
-  opacity: 0;
-  transition: opacity var(--transition);
-  margin-right: 2px;
-}
-
-.tab-item:hover .tab-drag-handle {
-  opacity: 0.5;
-}
-
-.tab-drag-handle:hover {
-  opacity: 1 !important;
-  color: var(--theme-color);
-}
-
-.tab-drag-handle svg {
-  width: 8px;
-  height: 12px;
+.tab-children.collapsed {
+  display: none;
 }
 
 /* インデント用スペーサー */
@@ -369,6 +499,7 @@ body.mode-mini .header-title-text {
   color: var(--text-muted);
   border-radius: var(--radius-sm);
   transition: all var(--transition);
+  cursor: pointer;
 }
 
 .tab-toggle:hover {
@@ -377,9 +508,20 @@ body.mode-mini .header-title-text {
 }
 
 .tab-toggle svg {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   transition: transform var(--transition);
+  opacity: 0.7;
+}
+
+body[data-toggle-size="small"] .tab-toggle svg {
+  width: 8px;
+  height: 8px;
+}
+
+body[data-toggle-size="large"] .tab-toggle svg {
+  width: 14px;
+  height: 14px;
 }
 
 .tab-toggle.collapsed svg {
@@ -418,11 +560,12 @@ body.mode-mini .header-title-text {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
+  padding: 2px 0;
 }
 
 .tab-title {
-  font-size: 12px;
+  font-size: var(--tab-font-size, 12px);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -430,12 +573,74 @@ body.mode-mini .header-title-text {
   line-height: 1.3;
 }
 
+.tab-title-input {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--theme-color);
+  color: var(--text-primary);
+  font-size: var(--tab-font-size, 12px);
+  padding: 1px 4px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  outline: none;
+  font-family: inherit;
+  margin: -1px 0;
+}
+
 .tab-url {
-  font-size: 10px;
+  font-size: var(--tab-url-font-size, 10px);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tab-relative-time {
+  font-size: var(--tab-url-font-size, 10px);
+  color: var(--text-muted);
+  margin-left: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tab-todo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  color: var(--theme-color);
+  background: var(--bg-secondary);
+  padding: 0px 5px;
+  border-radius: 4px;
+  width: fit-content;
+  border: 1px solid var(--theme-color);
+  opacity: 0.9;
+  margin-top: 1px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab-todo-tag:hover {
+  opacity: 1;
+  background: var(--bg-tertiary);
+}
+
+.tab-todo-tag.completed {
+  background: var(--bg-active);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.tab-todo-tag span {
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.tab-todo-tag.completed span {
+  color: var(--theme-color);
+  text-decoration: none;
+  display: inline-block;
 }
 
 /* ピンアイコン */
@@ -454,7 +659,6 @@ body.mode-mini .header-title-text {
   gap: 2px;
   margin-left: 4px;
   margin-right: 4px;
-  /* バッジとの間に隙間を作る */
 }
 
 .tab-item:hover .tab-actions {
@@ -489,17 +693,21 @@ body.mode-mini .header-title-text {
 /* 左側固定のバツボタン */
 .left-action {
   opacity: 0;
-  width: 0;
-  margin-right: 0;
+  width: 20px;
+  margin-right: 2px;
   transition: all var(--transition);
   overflow: hidden;
   flex-shrink: 0;
+  pointer-events: none;
+}
+
+body.disable-selection-animation .left-action {
+  transition: none;
 }
 
 .tab-item:hover .left-action {
   opacity: 1;
-  width: 20px;
-  margin-right: 2px;
+  pointer-events: auto;
 }
 
 .tab-action-btn.close-btn:hover {
@@ -511,16 +719,6 @@ body.mode-mini .header-title-text {
   height: 14px;
 }
 
-/* 子ツリー */
-.tab-children {
-  overflow: hidden;
-  transition: max-height 200ms ease, opacity 200ms ease;
-}
-
-.tab-children.collapsed {
-  display: none;
-}
-
 /* 子孫件数バッジ（展開時・折りたたみ時共通） */
 .desc-badge {
   font-size: 10px;
@@ -529,9 +727,7 @@ body.mode-mini .header-title-text {
   border-radius: 10px;
   padding: 1px 6px;
   margin-left: auto;
-  /* 右端に固定 */
   flex-shrink: 0;
-  /* 絶対に縮まない */
   min-width: 24px;
   text-align: center;
   transition: all var(--transition);
@@ -555,7 +751,6 @@ body.mode-mini .header-title-text {
   color: var(--theme-color);
   border-color: var(--theme-color);
 }
-
 
 /* 折りたたみ時は少し目立たせる */
 .tab-toggle.collapsed+img~.tab-info+.desc-badge,
@@ -773,19 +968,21 @@ body.mode-mini .header-title-text {
 }
 
 .history-title {
-  font-size: 12px;
+  font-size: var(--tab-font-size, 12px);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .history-url {
-  font-size: 10px;
+  font-size: var(--tab-url-font-size, 10px);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .history-time {
@@ -959,23 +1156,48 @@ body.mode-mini .header-title-text {
 }
 
 .bookmark-title {
-  font-size: 12px;
+  font-size: var(--tab-font-size, 12px);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .bookmark-path {
   font-size: 10px;
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   margin-top: 2px;
+  max-width: 100%;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.breadcrumb-link {
+  cursor: pointer;
+  transition: color var(--transition);
+  white-space: nowrap;
+}
+
+.breadcrumb-link:hover {
+  text-decoration: underline;
+  color: var(--theme-color);
+}
+
+.breadcrumb-separator {
+  margin: 0 3px;
+  opacity: 0.5;
+  user-select: none;
 }
 
 .bookmark-path svg {
@@ -986,11 +1208,12 @@ body.mode-mini .header-title-text {
 }
 
 .bookmark-url {
-  font-size: 10px;
+  font-size: var(--tab-url-font-size, 10px);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .bookmark-date {
@@ -2019,6 +2242,43 @@ body.mode-mini .pinned-count-label {
 .color-swatch-custom {
   background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
   font-size: 14px;
+}
+
+/* セッション管理モーダルのセクション */
+.modal-section {
+  padding: 8px 0;
+}
+
+.modal-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.save-session-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.save-session-form .modal-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.modal-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.session-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
 }
 
 .settings-select {

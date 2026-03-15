@@ -11,9 +11,14 @@ const state = {
   currentWindowId: null,
   showPinnedTabs: true,  // 固定タブセクションの表示状態
   tabActivationTime: {},  // tabId -> lastActivationTime（最近開いた順用）
+  lastSortMode: null,     // 前回のソートモードを記憶
+  lastMovedTabIds: [],    // アニメーション用：最後に子になったタブ
+
   tabGroupMap: {},        // tabId -> groupId（グループ認識用）
   tabGroupInfo: {},       // groupId -> { id, title, color, collapsed }
   tabGroupCollapseState: {}, // groupId -> collapsed (ローカルサイドバー状態)
+
+  googleTasks: {},        // url -> listName
 
   // 履歴パネル
   historyItems: [],
@@ -42,6 +47,11 @@ const state = {
     colorScheme: 'auto',
     sidePanelSide: 'right',
     miniTreeWidth: 90,
+    focusIntensity: 'medium', // 'none', 'low', 'medium', 'high'
+    closeOnSelect: false,
+    tabSelectionAnimation: true,
+    tabFontSize: 12,
+    toggleSize: 'medium',
     shortcuts: {
       'new-tab': 'Alt+N',
       'toggle-pinned': 'Alt+P',
@@ -54,7 +64,7 @@ const state = {
       'switch-history': 'Alt+2',
       'switch-bookmarks': 'Alt+3',
       'switch-settings': 'Alt+4',
-      'toggle-mini-tree': 'Cmd+Shift+X'
+      // 'toggle-mini-tree': 'Cmd+Shift+X'
     }
   },
   isRecordingShortcut: false,
@@ -76,7 +86,7 @@ const SHORTCUT_ACTIONS = [
   { id: 'sort-mode', label: chrome.i18n.getMessage('actionSortMode') },
   { id: 'collapse-all', label: chrome.i18n.getMessage('actionCollapseAll') },
   { id: 'expand-all', label: chrome.i18n.getMessage('actionExpandAll') },
-  { id: 'toggle-mini-tree', label: chrome.i18n.getMessage('actionToggleMiniTree') }
+  // { id: 'toggle-mini-tree', label: chrome.i18n.getMessage('actionToggleMiniTree') }
 ];
 
 // デフォルトのタブ設定
@@ -103,15 +113,15 @@ const MODE_ICONS = {
     <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
   </svg>`,
 };
-const MODE_LABELS = { full: '通常', compact: 'コンパクト', mini: 'ミニ' };
 
-function applyDisplayMode(mode) {
+
+async function applyDisplayMode(mode) {
   DISPLAY_MODES.forEach(m => document.body.classList.remove(`mode-${m}`));
   document.body.classList.add(`mode-${mode}`);
   state.displayMode = mode;
-  try { localStorage.setItem('ttm-displayMode', mode); } catch { }
+  try { await chrome.storage.local.set({ 'ttm-displayMode': mode }); } catch { }
 
-  const btn = document.getElementById('btn-display-mode');
+  const btn = document.getElementById('btn-toggle-mini-tree') ? document.getElementById('btn-display-mode') : document.getElementById('btn-display-mode');
   if (!btn) return;
   btn.innerHTML = MODE_ICONS[mode];
 
@@ -222,6 +232,11 @@ function applyColorScheme() {
   }
 }
 
+function applyToggleSize() {
+  const size = state.userSettings.toggleSize || 'medium';
+  document.body.setAttribute('data-toggle-size', size);
+}
+
 // 初期化時に外観モードを適用
 applyColorScheme();
 
@@ -246,12 +261,14 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
   if (sel) sel.value = next;
 });
 
+/* btn-toggle-mini-tree deactivated
 document.getElementById('btn-toggle-mini-tree').addEventListener('click', () => {
   chrome.storage.local.get('ttm-mini-tree-visible', (res) => {
     const next = !res['ttm-mini-tree-visible'];
     chrome.storage.local.set({ 'ttm-mini-tree-visible': next });
   });
 });
+*/
 
 // ===== タブ並び順モード管理 =====
 // 'tree'（ツリー表示）| 'recent'（最近開いた順フラット表示）
@@ -389,11 +406,11 @@ function formatTime(timestamp) {
   const diffMin = Math.floor(diffMs / 60000);
   const diffHour = Math.floor(diffMs / 3600000);
   if (diffMin < 1) return chrome.i18n.getMessage('timeJustNow');
-  if (diffMin < 60) return `${diffMin}分前`;
-  if (diffHour < 24) return `${diffHour}時間前`;
+  if (diffMin < 60) return chrome.i18n.getMessage('timeMinsAgo', [diffMin.toString()]);
+  if (diffHour < 24) return chrome.i18n.getMessage('timeHoursAgo', [diffHour.toString()]);
   const diffDay = Math.floor(diffMs / 86400000);
-  if (diffDay < 7) return `${diffDay}日前`;
-  return d.toLocaleDateString('ja-JP');
+  if (diffDay < 7) return chrome.i18n.getMessage('timeDaysAgo', [diffDay.toString()]);
+  return d.toLocaleDateString(undefined);
 }
 
 function formatDate(timestamp) {
@@ -402,12 +419,12 @@ function formatDate(timestamp) {
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
 
-  if (d.toDateString() === today.toDateString()) return '今日';
-  if (d.toDateString() === yesterday.toDateString()) return '昨日';
+  if (d.toDateString() === today.toDateString()) return chrome.i18n.getMessage('timeToday');
+  if (d.toDateString() === yesterday.toDateString()) return chrome.i18n.getMessage('timeYesterday');
 
   const diffDay = Math.floor((today - d) / 86400000);
-  if (diffDay < 7) return `${diffDay}日前`;
-  return d.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+  if (diffDay < 7) return chrome.i18n.getMessage('timeDaysAgo', [diffDay.toString()]);
+  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
 }
 
 function getFaviconUrl(url) {
@@ -433,20 +450,27 @@ function getDefaultFavicon() {
 // ===== ユーザー設定管理 =====
 
 
-function loadUserSettings() {
+async function loadUserSettings() {
   try {
-    const saved = localStorage.getItem('ttm-user-settings');
+    const data = await chrome.storage.local.get(['ttm-user-settings', 'ttm-displayMode']);
+    const saved = data['ttm-user-settings'];
     if (saved) {
-      const parsed = JSON.parse(saved);
+      const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
       state.userSettings = {
         ...state.userSettings,
         ...parsed,
         shortcuts: { ...state.userSettings.shortcuts, ...(parsed.shortcuts || {}) }
       };
+      // 旧設定からの移行
+      if (parsed.focusEffect === false) state.userSettings.focusIntensity = 'none';
+      if (parsed.focusEffect === true && !parsed.focusIntensity) state.userSettings.focusIntensity = 'medium';
+    }
+    if (data['ttm-displayMode']) {
+      state.displayMode = data['ttm-displayMode'];
     }
   } catch (e) { }
   applyColorScheme();
-  // 起動時にショートカットと位置設定、幅をcontent scriptが読めるようにsync
+  // 他のコンポーネント用への同期
   chrome.storage.local.set({
     'ttm-shortcuts': state.userSettings.shortcuts || {},
     'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
@@ -462,11 +486,10 @@ function saveUserSettingsDebounced() {
   }, 500);
 }
 
-function saveUserSettings() {
+async function saveUserSettings() {
   try {
-    localStorage.setItem('ttm-user-settings', JSON.stringify(state.userSettings));
-    // content scriptが読めるようにchrome.storage.localにも同期
-    chrome.storage.local.set({
+    await chrome.storage.local.set({
+      'ttm-user-settings': state.userSettings,
       'ttm-shortcuts': state.userSettings.shortcuts || {},
       'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
       'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
@@ -475,11 +498,12 @@ function saveUserSettings() {
 }
 
 // ===== タブナビゲーション設定管理 =====
-function loadTabConfig() {
+async function loadTabConfig() {
   try {
-    const saved = localStorage.getItem('ttm-tab-config');
+    const data = await chrome.storage.local.get(['ttm-tab-config']);
+    const saved = data['ttm-tab-config'];
     if (saved) {
-      const parsed = JSON.parse(saved);
+      const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
       // Ensure all defaults exist in parsed (in case of updates)
       const merged = parsed.filter(p => DEFAULT_TAB_CONFIG.some(d => d.id === p.id));
       DEFAULT_TAB_CONFIG.forEach(d => {
@@ -502,9 +526,9 @@ function loadTabConfig() {
   }
 }
 
-function saveTabConfig() {
+async function saveTabConfig() {
   try {
-    localStorage.setItem('ttm-tab-config', JSON.stringify(state.tabConfig));
+    await chrome.storage.local.set({ 'ttm-tab-config': state.tabConfig });
   } catch (e) {
     console.error('Failed to save tab config', e);
   }
@@ -742,6 +766,63 @@ function renderSettingsPanel() {
     };
   }
 
+  const selFocusIntensity = document.getElementById('setting-focus-intensity');
+  if (selFocusIntensity) {
+    selFocusIntensity.value = state.userSettings.focusIntensity || 'medium';
+    selFocusIntensity.onchange = (e) => {
+      state.userSettings.focusIntensity = e.target.value;
+      saveUserSettings();
+      applyFocusIntensity();
+      updateFocusState();
+    };
+  }
+
+  const cbCloseOnSelect = document.getElementById('setting-close-on-select');
+  if (cbCloseOnSelect) {
+    cbCloseOnSelect.checked = !!state.userSettings.closeOnSelect;
+    cbCloseOnSelect.onchange = (e) => {
+      state.userSettings.closeOnSelect = e.target.checked;
+      saveUserSettings();
+      applyCloseOnSelectUI();
+    };
+  }
+
+  const cbTabAnim = document.getElementById('setting-tab-selection-animation');
+  if (cbTabAnim) {
+    cbTabAnim.checked = !!state.userSettings.tabSelectionAnimation;
+    cbTabAnim.onchange = (e) => {
+      state.userSettings.tabSelectionAnimation = e.target.checked;
+      saveUserSettings();
+      applyTabSelectionAnimationUI();
+    };
+  }
+
+  const selToggleSize = document.getElementById('setting-toggle-size');
+  if (selToggleSize) {
+    selToggleSize.value = state.userSettings.toggleSize || 'medium';
+    selToggleSize.onchange = (e) => {
+      state.userSettings.toggleSize = e.target.value;
+      saveUserSettings();
+      applyToggleSize();
+    };
+  }
+
+  // タブの文字サイズ設定
+  const sliderFontSize = document.getElementById('setting-tab-font-size');
+  const spanFontSize = document.getElementById('tab-font-size-value');
+  if (sliderFontSize && spanFontSize) {
+    const val = state.userSettings.tabFontSize || 12;
+    sliderFontSize.value = val;
+    spanFontSize.textContent = `${val}px`;
+    sliderFontSize.oninput = (e) => {
+      const v = parseInt(e.target.value);
+      spanFontSize.textContent = `${v}px`;
+      state.userSettings.tabFontSize = v;
+      saveUserSettingsDebounced();
+      applyTabFontSize();
+    };
+  }
+
   renderShortcutsSettings();
 }
 
@@ -938,7 +1019,7 @@ document.addEventListener('keydown', (e) => {
     hideContextMenu();
     if (state.selectingParentFor != null) {
       cancelParentSelection();
-      showToast('キャンセルしました');
+      showToast(chrome.i18n.getMessage('toastCancelled'));
     }
     return;
   }
@@ -976,6 +1057,18 @@ function getBranchIds(tab) {
     ids = ids.concat(getBranchIds(child));
   });
   return ids;
+}
+function getRelativeTimeString(ms) {
+  if (!ms) return '';
+  const diff = Date.now() - ms;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}h`;
+  const day = Math.floor(hour / 24);
+  return `${day}d`;
 }
 
 // ツリー構造を構築
@@ -1095,7 +1188,7 @@ function renderGroupSection(groupId, groupInfo, groupTabs) {
       <svg viewBox="0 0 10 10" fill="currentColor"><path d="M2 3l3 4 3-4H2z"/></svg>
     </div>
     <div class="tab-group-dot"></div>
-    <span class="tab-group-title">${escapeHtml(groupInfo?.title || 'グループ')}</span>
+    <span class="tab-group-title">${escapeHtml(groupInfo?.title || chrome.i18n.getMessage('groupDefaultName'))}</span>
     <span class="tab-group-count">${groupTabs.length}</span>
   `;
 
@@ -1133,7 +1226,7 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
     // 色選択スウォッチ行
     {
       colorRow: true,
-      label: '色:',
+      label: chrome.i18n.getMessage('ctxColor'),
       colors: GROUP_COLORS.map(c => ({
         name: c.name,
         label: c.label,
@@ -1143,7 +1236,7 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
             await chrome.tabGroups.update(groupId, { color: c.name });
             await refreshTabTree();
           } catch {
-            showToast('色の変更に失敗しました', 'error');
+            showToast(chrome.i18n.getMessage('toastColorUpdateFailed'), 'error');
           }
         }
       }))
@@ -1153,13 +1246,13 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
       label: chrome.i18n.getMessage('ctxEditGroupName'),
       icon: pencilIcon,
       action: async () => {
-        const newTitle = prompt('グループ名:', groupInfo?.title || '');
+        const newTitle = prompt(chrome.i18n.getMessage('promptEditGroup'), groupInfo?.title || '');
         if (newTitle === null) return;
         try {
           await chrome.tabGroups.update(groupId, { title: newTitle });
           await refreshTabTree();
         } catch {
-          showToast('グループ名の変更に失敗しました', 'error');
+          showToast(chrome.i18n.getMessage('toastGroupUpdateFailed') || 'Update failed', 'error');
         }
       }
     },
@@ -1173,9 +1266,9 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
         try {
           await chrome.tabs.ungroup(tabsInGroup.map(t => t.id));
           await refreshTabTree();
-          showToast('グループを解除しました', 'success');
+          showToast(chrome.i18n.getMessage('toastGroupUngrouped'), 'success');
         } catch {
-          showToast('グループの解除に失敗しました', 'error');
+          showToast(chrome.i18n.getMessage('toastGroupUngroupFailed'), 'error');
         }
       }
     }
@@ -1194,13 +1287,26 @@ function renderTabTree() {
   const pinnedCountEl = document.getElementById('pinned-count-label');
   if (pinnedCountEl) pinnedCountEl.textContent = String(pinnedTotal);
 
-  // 固定タブトグルボタンのスタイル更新
-  const togglePinnedBtn = document.getElementById('btn-toggle-pinned');
-  if (togglePinnedBtn) {
-    togglePinnedBtn.classList.toggle('pinned-hidden', !state.showPinnedTabs);
-    togglePinnedBtn.title = state.showPinnedTabs
-      ? `固定タブを非表示 (${pinnedTotal}件)`
-      : `固定タブを表示 (${pinnedTotal}件)`;
+  // すべて展開/折りたたみボタンのアイコン状態を更新
+  const toggleAllBtn = document.getElementById('btn-toggle-all');
+  if (toggleAllBtn) {
+    const icon = toggleAllBtn.querySelector('.toggle-all-icon');
+    if (icon) {
+      // いずれかの親タブが展開されていたら「折りたたみ可能」状態
+      const anyExpanded = state.tabs.some(tab => {
+        const hasChildren = state.tabs.some(t => state.tabParents[t.id] === tab.id);
+        return hasChildren && !state.collapseState[tab.id];
+      });
+      icon.classList.toggle('expanded', !anyExpanded);
+      toggleAllBtn.title = anyExpanded ? chrome.i18n.getMessage('toolbarCollapseAll') : chrome.i18n.getMessage('toolbarExpandAll');
+    }
+  }
+
+  // ソートモードが最近開いた順ならタイマー開始、そうでなければ停止
+  if (state.tabSortMode === 'recent') {
+    startRecentTimeUpdateTimer();
+  } else {
+    stopRecentTimeUpdateTimer();
   }
 
   container.innerHTML = '';
@@ -1215,7 +1321,7 @@ function renderTabTree() {
       <div class="section-toggle">
         <svg viewBox="0 0 10 10" fill="currentColor"><path d="M2 3l3 4 3-4H2z"/></svg>
       </div>
-      📌 固定タブ (${pinnedTotal})
+      ${chrome.i18n.getMessage('pinnedHeader', [pinnedTotal.toString()])}
     `;
 
     label.addEventListener('click', () => {
@@ -1299,10 +1405,16 @@ function renderTabNode(container, tab, depth) {
 function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) {
   const item = document.createElement('div');
   item.className = `tab-item${tab.id === state.activeTabId ? ' active-tab' : ''}${tab.pinned ? ' pinned-tab' : ''}`;
+  if (state.lastMovedTabIds.includes(tab.id)) {
+    item.className += ' animating-child';
+    // 次回のレンダリングで繰り返さないよう、少し遅れてクリア
+    setTimeout(() => {
+      state.lastMovedTabIds = state.lastMovedTabIds.filter(id => id !== tab.id);
+    }, 1000);
+  }
   item.dataset.tabId = tab.id;
   item.draggable = true;
 
-  const indentPx = depth * 16 + 4;
   const faviconUrl = getFaviconUrl(tab.url);
 
   // 固定タブではピンボタンを非表示（右クリックメニューで操作可能）
@@ -1312,30 +1424,20 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
   const tabGroupId = state.tabGroupMap[tab.id];
   const tabGroupInfo = tabGroupId !== undefined ? state.tabGroupInfo[tabGroupId] : null;
   const groupDotHtml = tabGroupInfo
-    ? `<span class="tab-group-dot-sm group-dot-${tabGroupInfo.color}" title="${escapeHtml(tabGroupInfo.title || 'グループ')}"></span>`
+    ? `<span class="tab-group-dot-sm group-dot-${tabGroupInfo.color}" title="${escapeHtml(tabGroupInfo.title || chrome.i18n.getMessage('groupDefaultName'))}"></span>`
     : '';
-
-  const childIconHtml = depth > 0
-    ? `<div class="tab-child-connector"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2v7a2 2 0 002 2h6v-2.5l3.5 3.5-3.5 3.5v-2.5h-6a4 4 0 01-4-4v-7h2z"/></svg></div>`
-    : '';
-
-  // padding-left を使ってインデントすることで、右端のバッジが画面外に見切れるのを防ぐ
-  item.style.paddingLeft = `${indentPx}px`;
 
   item.innerHTML = `
-    <button class="tab-action-btn close-btn left-action" data-action="close" title="閉じる">
+    <div class="tab-toggle ${hasChildren ? (isCollapsed ? 'collapsed' : '') : 'no-children'}">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 6 8 10 12 6"></polyline>
+      </svg>
+    </div>
+    <button class="tab-action-btn close-btn left-action" data-action="close" title="${chrome.i18n.getMessage('ctxClose')}">
       <svg viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
       </svg>
     </button>
-    ${childIconHtml}
-    <div class="tab-drag-handle">
-      <svg viewBox="0 0 10 10" fill="currentColor">
-        <circle cx="3" cy="3" r="1"/><circle cx="7" cy="3" r="1"/>
-        <circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/>
-        <circle cx="3" cy="7" r="1"/><circle cx="7" cy="7" r="1"/>
-      </svg>
-    </div>
     <div class="tab-content-wrapper">
       ${groupDotHtml}
       ${faviconUrl
@@ -1347,16 +1449,28 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
       <div class="tab-info">
         <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
         ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
+        ${(() => {
+      const taskInfo = state.googleTasks[tab.url];
+      if (!taskInfo) return '';
+      // 互換性維持：文字列（旧形式）の場合はリスト名として扱う
+      const listName = typeof taskInfo === 'string' ? taskInfo : taskInfo.listName;
+      const status = typeof taskInfo === 'string' ? 'needsAction' : taskInfo.status;
+      const isCompleted = status === 'completed';
+      return `<div class="tab-todo-tag ${isCompleted ? 'completed' : ''}" title="${escapeHtml(listName)} (Click to toggle status)">
+                    <span>${isCompleted ? '✓' : '○'}</span>${escapeHtml(listName)}
+                  </div>`;
+    })()}
       </div>
+      ${(state.tabSortMode === 'recent' && !tab.pinned) ? `<span class="tab-relative-time">${getRelativeTimeString(state.tabActivationTime[tab.id])}</span>` : ''}
       <div class="tab-actions">
-        ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="固定">
+        ${showPinBtn ? `<button class="tab-action-btn" data-action="pin" title="${chrome.i18n.getMessage('ctxPin')}">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/>
           </svg>
         </button>` : ''}
         ${hasChildren ? (() => {
       const total = countDescendants(tab);
-      return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="このタブと子タブをすべて閉じる（${total + 1}個）">
+      return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="${chrome.i18n.getMessage('ctxCloseTree')} (${total + 1}${chrome.i18n.getMessage('tabsText')})">
               <svg viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
               </svg>
@@ -1365,7 +1479,7 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
       </div>
       ${hasChildren ? (() => {
       const total = countDescendants(tab);
-      return `<span class="desc-badge clickable-toggle ${isCollapsed ? 'collapsed' : ''}" title="${isCollapsed ? '展開' : '折りたたみ'}（${total}件の子孫タブ）">${total}</span>`;
+      return `<span class="desc-badge clickable-toggle ${isCollapsed ? 'collapsed' : ''}" title="${isCollapsed ? chrome.i18n.getMessage('toolbarExpandAll') : chrome.i18n.getMessage('toolbarCollapseAll')} (${total} ${chrome.i18n.getMessage('tabsText')})">${total}</span>`;
     })() : ''}
     </div>
   `;
@@ -1385,18 +1499,45 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
       if (tab.id === childTabId) {
         // 自分自身はキャンセル扱い
         cancelParentSelection();
-        showToast('キャンセルしました');
+        showToast(chrome.i18n.getMessage('toastCancelled'));
         return;
       }
       cancelParentSelection();
       sendMessage('SET_TAB_PARENT', { tabId: childTabId, parentId: tab.id })
         .then(() => refreshTabTree())
-        .then(() => showToast('親タブを設定しました', 'success'));
+        .then(() => showToast(chrome.i18n.getMessage('toastParentSet'), 'success'));
       return;
     }
 
     activateTab(tab.id, tab.windowId);
   });
+
+  // ダブルクリックでタイトルをその場で編集 / アクティブタブなら更新
+  item.addEventListener('dblclick', (e) => {
+    if (e.target.closest('.tab-toggle') || e.target.closest('.tab-action-btn')) return;
+
+    const isTitle = e.target.closest('.tab-title');
+    // アクティブなタブをタイトル以外でダブルクリックした場合はページを更新
+    if (tab.id === state.activeTabId && !isTitle) {
+      chrome.tabs.reload(tab.id);
+      return;
+    }
+
+    // それ以外（タイトルダブルクリック、または非アクティブタブのダブルクリック）は名前編集
+    const titleEl = item.querySelector('.tab-title');
+    if (titleEl) {
+      startInlineTabEdit(tab.id, titleEl);
+    }
+  });
+
+  // 折りたたみトグル
+  const toggle = item.querySelector('.tab-toggle');
+  if (toggle && hasChildren) {
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleTabCollapse(tab.id);
+    });
+  }
 
   // 折りたたみトグル（件数バッジをクリック）
   const badgeToggle = item.querySelector('.desc-badge.clickable-toggle');
@@ -1433,10 +1574,33 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
   }
 
   // 右クリックコンテキストメニュー
-  item.addEventListener('contextmenu', (e) => {
+  item.addEventListener('contextmenu', async (e) => {
     e.preventDefault();
-    showTabContextMenu(e.clientX, e.clientY, tab);
+    await showTabContextMenu(e.clientX, e.clientY, tab);
   });
+
+  // トグルクリックイベント
+  const todoTag = item.querySelector('.tab-todo-tag');
+  if (todoTag && state.googleTasks[tab.url]) {
+    todoTag.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const taskInfo = state.googleTasks[tab.url];
+      try {
+        const res = await sendMessage('TOGGLE_GOOGLE_TASK_STATUS', {
+          listId: taskInfo.listId,
+          taskId: taskInfo.taskId,
+          status: taskInfo.status
+        });
+        if (res.success) {
+          await refreshGoogleTasks();
+        } else {
+          showToast('Failed to toggle status', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  }
 
   // ドラッグ&ドロップ
   setupDragAndDrop(item, tab);
@@ -1444,7 +1608,28 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
   return item;
 }
 
-function showTabContextMenu(x, y, tab) {
+async function addTabToGoogleTodo(tab, listId = null) {
+  showToast(chrome.i18n.getMessage('msgLoading'), 'info');
+  try {
+    const res = await sendMessage('ADD_TO_GOOGLE_TODO', {
+      tabId: tab.id,
+      url: tab.url,
+      title: getTabDisplayName(tab),
+      listId: listId
+    });
+    if (res.success) {
+      showToast(chrome.i18n.getMessage('toastAddedToGoogleTodo'), 'success');
+      await refreshGoogleTasks();
+    } else {
+      const errorMsg = res.error || chrome.i18n.getMessage('toastGoogleTodoAddFailed');
+      showToast(errorMsg, 'error');
+    }
+  } catch (e) {
+    showToast(chrome.i18n.getMessage('toastGoogleTodoAddFailed'), 'error');
+  }
+}
+
+async function showTabContextMenu(x, y, tab) {
   // 親タブ（子タブがある）かどうか（state.tabParents から正確に判定）
   const hasChildren = state.tabs.some(t => state.tabParents[t.id] === tab.id);
   // 最近開いた順モードではツリー操作を非表示にする
@@ -1475,14 +1660,33 @@ function showTabContextMenu(x, y, tab) {
       action: () => toggleTabPin(tab.id, !tab.pinned)
     },
     {
-      label: '子タブとして新しいタブを開く',
+      label: chrome.i18n.getMessage('ctxOpenChildTab'),
       icon: ICON.child,
       // 最近開いた順モードではツリー構造が見えないためグレーアウト
       disabled: isRecentMode,
-      hint: isRecentMode ? 'ツリーモードのみ' : undefined,
+      hint: isRecentMode ? chrome.i18n.getMessage('sortRecentUsed') : undefined,
       action: () => createChildTab(tab.id)
     }
   ];
+
+  // Google Todo 追加メニュー
+  if (!state.googleTasks[tab.url]) {
+    try {
+      const res = await sendMessage('GET_TASK_LISTS');
+      if (res.success && res.lists && res.lists.length > 0) {
+        menuItems.push({ separator: true });
+        res.lists.forEach(list => {
+          menuItems.push({
+            label: `To: ${list.title}`,
+            icon: ICON.readingList,
+            action: () => addTabToGoogleTodo(tab, list.id)
+          });
+        });
+      }
+    } catch (e) {
+      console.error('[TTM] Failed to fetch task lists for context menu');
+    }
+  }
 
   // ─── グループ操作（固定タブ・全モード共通）───
   if (!tab.pinned) {
@@ -1496,9 +1700,9 @@ function showTabContextMenu(x, y, tab) {
           try {
             await chrome.tabs.ungroup([tab.id]);
             await refreshTabTree();
-            showToast('グループから除外しました', 'success');
+            showToast(chrome.i18n.getMessage('toastGroupRemoved'), 'success');
           } catch {
-            showToast('グループからの除外に失敗しました', 'error');
+            showToast(chrome.i18n.getMessage('toastGroupRemoveFailed'), 'error');
           }
         }
       });
@@ -1508,34 +1712,34 @@ function showTabContextMenu(x, y, tab) {
       if (existingGroups.length > 0) {
         existingGroups.forEach(group => {
           menuItems.push({
-            label: `「${group.title || 'グループ'}」に追加`,
+            label: chrome.i18n.getMessage('ctxAddToGroup', [group.title || chrome.i18n.getMessage('groupDefaultName')]),
             icon: `<span class="tab-group-dot-sm group-dot-${group.color}"></span>`,
             action: async () => {
               try {
                 await chrome.tabs.group({ tabIds: [tab.id], groupId: group.id });
                 await refreshTabTree();
-                showToast(`グループに追加しました`, 'success');
+                showToast(chrome.i18n.getMessage('toastGroupAdded'), 'success');
               } catch {
-                showToast('グループへの追加に失敗しました', 'error');
+                showToast(chrome.i18n.getMessage('toastGroupAddFailed'), 'error');
               }
             }
           });
         });
       }
       menuItems.push({
-        label: '新しいグループを作成',
+        label: chrome.i18n.getMessage('ctxNewGroup'),
         icon: ICON.tag,
         action: async () => {
           try {
             const gid = await chrome.tabs.group({ tabIds: [tab.id] });
-            const title = prompt('グループ名 (省略可):', '');
+            const title = prompt(chrome.i18n.getMessage('promptEditGroup'), '');
             if (title !== null && title.trim()) {
               await chrome.tabGroups.update(gid, { title: title.trim() });
             }
             await refreshTabTree();
-            showToast('グループを作成しました', 'success');
+            showToast(chrome.i18n.getMessage('toastGroupCreated'), 'success');
           } catch {
-            showToast('グループの作成に失敗しました', 'error');
+            showToast(chrome.i18n.getMessage('toastGroupCreateFailed'), 'error');
           }
         }
       });
@@ -1549,7 +1753,7 @@ function showTabContextMenu(x, y, tab) {
       const belowTabs = state.tabs.filter(t => !t.pinned && t.index > tab.index);
       if (belowTabs.length > 0) {
         menuItems.push({
-          label: `これより下のタブを子タブにする (${belowTabs.length}個)`,
+          label: `${chrome.i18n.getMessage('ctxMakeChildren')} (${belowTabs.length})`,
           icon: ICON.down,
           action: () => makeTabsBelowChildren(tab)
         });
@@ -1566,7 +1770,7 @@ function showTabContextMenu(x, y, tab) {
           action: () => moveChildrenToParentLevel(tab.id)
         },
         {
-          label: `このタブと子ツリーを削除 (${countDescendants(tab) + 1}個)`,
+          label: `${chrome.i18n.getMessage('ctxCloseTree')} (${countDescendants(tab) + 1})`,
           danger: true,
           icon: ICON.trash,
           action: () => closeTabWithChildren(tab.id)
@@ -1574,7 +1778,7 @@ function showTabContextMenu(x, y, tab) {
       );
     } else {
       menuItems.push({
-        label: '親タブの子にする',
+        label: chrome.i18n.getMessage('ctxMoveToGrandparent'),
         icon: ICON.left,
         action: () => moveToParent(tab.id)
       });
@@ -1589,7 +1793,7 @@ function showTabContextMenu(x, y, tab) {
       });
       if (sameDomainTabs.length > 0) {
         menuItems.push({
-          label: `同じドメインのタブをまとめる (${sameDomainTabs.length}個)`,
+          label: `${chrome.i18n.getMessage('ctxGroupDomain')} (${sameDomainTabs.length})`,
           icon: ICON.domain,
           action: () => aggregateSameDomain(tab.id, sameDomainTabs)
         });
@@ -1635,13 +1839,13 @@ function showTabContextMenu(x, y, tab) {
           });
           showToast(chrome.i18n.getMessage('toastAddedToReadingList'), 'success');
         } catch (e) {
-          showToast('追加に失敗しました (既に存在する可能性があります)', 'error');
+          showToast(chrome.i18n.getMessage('toastReadingListAddFailed'), 'error');
         }
       }
     },
     { separator: true },
     {
-      label: hasChildren && !isRecentMode ? 'このタブを閉じる' : chrome.i18n.getMessage('ctxCloseTab'),
+      label: hasChildren && !isRecentMode ? chrome.i18n.getMessage('ctxCloseOnlyTab') : chrome.i18n.getMessage('ctxCloseTab'),
       danger: true,
       icon: ICON.close,
       action: () => closeTab(tab.id)
@@ -1655,13 +1859,14 @@ function showTabContextMenu(x, y, tab) {
 async function makeTabsBelowChildren(tab) {
   const belowTabs = state.tabs.filter(t => !t.pinned && t.index > tab.index);
   if (belowTabs.length === 0) {
-    showToast('このタブより下にタブがありません', 'error');
+    showToast(chrome.i18n.getMessage('toastNoTabsBelow'), 'error');
     return;
   }
+  state.lastMovedTabIds = belowTabs.map(t => t.id);
   for (const t of belowTabs) {
     await sendMessage('SET_TAB_PARENT', { tabId: t.id, parentId: tab.id });
   }
-  showToast(`${belowTabs.length}個のタブを子タブにしました`, 'success');
+  showToast(chrome.i18n.getMessage('toastTabsGroupedCounted', [belowTabs.length.toString()]), 'success');
   await refreshTabTree();
 }
 
@@ -1670,7 +1875,7 @@ async function moveChildrenToParentLevel(tabId) {
   // state.tabParents を直接使って直接の子タブを収集（state.tabs は .children を持たないフラット配列）
   const children = state.tabs.filter(t => state.tabParents[t.id] === tabId);
   if (children.length === 0) {
-    showToast('子タブがありません', 'error');
+    showToast(chrome.i18n.getMessage('toastNoChildTabs'), 'error');
     return;
   }
 
@@ -1678,7 +1883,7 @@ async function moveChildrenToParentLevel(tabId) {
   for (const child of children) {
     await sendMessage('SET_TAB_PARENT', { tabId: child.id, parentId });
   }
-  showToast('子タブを移動しました', 'success');
+  showToast(chrome.i18n.getMessage('toastChildTabsMoved'), 'success');
   await refreshTabTree();
 }
 
@@ -1725,7 +1930,7 @@ function moveToParent(tabId) {
   const self = document.querySelector(`.tab-item[data-tab-id="${tabId}"]`);
   if (self) self.classList.add('selecting-parent');
 
-  showToast('親にしたいタブをクリック（Escでキャンセル）');
+  showToast(chrome.i18n.getMessage('toastSelectParent'));
 }
 
 // 親選択モードをキャンセル
@@ -1738,10 +1943,11 @@ function cancelParentSelection() {
 
 // 同じドメインのタブをまとめる
 async function aggregateSameDomain(parentTabId, sameDomainTabs) {
+  state.lastMovedTabIds = sameDomainTabs.map(t => t.id);
   for (const tab of sameDomainTabs) {
     await sendMessage('SET_TAB_PARENT', { tabId: tab.id, parentId: parentTabId });
   }
-  showToast(`${sameDomainTabs.length}個のタブを子にしました`, 'success');
+  showToast(chrome.i18n.getMessage('toastTabsGroupedCounted', [sameDomainTabs.length.toString()]), 'success');
   await refreshTabTree();
 }
 
@@ -1753,7 +1959,7 @@ async function moveToGrandParentLevel(tabId, grandParentId) {
     await refreshTabTree();
   } catch (err) {
     console.error('Failed to move tab:', err);
-    showToast('移動に失敗しました', 'error');
+    showToast(chrome.i18n.getMessage('toastTabMoveFailed'), 'error');
   }
 }
 
@@ -1762,7 +1968,7 @@ async function moveToGrandParentLevel(tabId, grandParentId) {
 // タブ名を編集
 async function editTabName(tab) {
   const currentName = state.customTabNames[tab.id] || tab.title;
-  const newName = prompt(`タブ名を編集:\n\n現在: ${currentName}\n\n※ 空白で削除`, currentName);
+  const newName = prompt(chrome.i18n.getMessage('promptEditTabName', [currentName]), currentName);
 
   if (newName === null) return; // キャンセル
 
@@ -1790,6 +1996,72 @@ async function editTabName(tab) {
 }
 
 // カスタム名を取得（存在すれば返す）
+function saveTabCustomName(tabId, url, newName) {
+  if (newName) {
+    state.customTabNames[tabId] = newName;
+    state.tabCustomNamesByUrl[url] = newName;
+    localStorage.setItem(`ttm-custom-name-${tabId}`, newName);
+    localStorage.setItem(`ttm-custom-name-url-${url}`, newName);
+  } else {
+    delete state.customTabNames[tabId];
+    delete state.tabCustomNamesByUrl[url];
+    localStorage.removeItem(`ttm-custom-name-${tabId}`);
+    localStorage.removeItem(`ttm-custom-name-url-${url}`);
+  }
+}
+
+function startInlineTabEdit(tabId, titleEl) {
+  const currentName = titleEl.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'tab-title-input';
+  input.value = currentName;
+
+  // 元のタイトルを一時的に非表示にし、入力を挿入
+  const originalDisplay = titleEl.style.display;
+  titleEl.style.display = 'none';
+  titleEl.parentNode.insertBefore(input, titleEl);
+
+  input.focus();
+  input.select();
+
+  let isFinished = false;
+  const finishEdit = (save) => {
+    if (isFinished) return;
+    isFinished = true;
+
+    const newValue = input.value.trim();
+    if (input.parentNode) {
+      input.parentNode.removeChild(input);
+    }
+    titleEl.style.display = originalDisplay;
+
+    if (save && newValue !== currentName) {
+      const tab = state.tabs.find(t => t.id === tabId);
+      if (tab) {
+        saveTabCustomName(tabId, tab.url, newValue);
+        // ツリー全体を再描画して変更を反映
+        renderTabTree();
+        showToast(chrome.i18n.getMessage('toastTabNameUpdated'), 'success');
+      }
+    }
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      finishEdit(true);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      finishEdit(false);
+    }
+  });
+
+  input.addEventListener('blur', () => finishEdit(true));
+  input.addEventListener('click', (e) => e.stopPropagation());
+  input.addEventListener('mousedown', (e) => e.stopPropagation());
+}
+
 function getTabDisplayName(tab) {
   // 1. tabIdで保存されたカスタム名
   if (state.customTabNames[tab.id]) {
@@ -1811,6 +2083,11 @@ async function activateTab(tabId, windowId) {
     try { localStorage.setItem(`ttm-tab-activation-${tabId}`, state.tabActivationTime[tabId]); } catch { }
 
     await sendMessage('ACTIVATE_TAB', { tabId, windowId });
+
+    // 設定が有効な場合、サイドパネルを閉じる
+    if (state.userSettings.closeOnSelect) {
+      window.close();
+    }
   } catch (e) {
     console.error('Failed to activate tab:', e);
   }
@@ -1849,9 +2126,21 @@ function toggleTabCollapse(tabId) {
   if (childrenEl) {
     childrenEl.classList.toggle('collapsed', isCollapsed);
   }
-
   // バックグラウンドに通知
   sendMessage('SET_TAB_COLLAPSED', { tabId, collapsed: isCollapsed });
+}
+
+function toggleAllCollapse() {
+  const anyExpanded = state.tabs.some(tab => {
+    const hasChildren = state.tabs.some(t => state.tabParents[t.id] === tab.id);
+    return hasChildren && !state.collapseState[tab.id];
+  });
+
+  if (anyExpanded) {
+    collapseAll();
+  } else {
+    expandAll();
+  }
 }
 
 function collapseAll() {
@@ -1973,6 +2262,7 @@ function setupDragAndDrop(item, tab) {
 
       if (zone === 'inside') {
         // ─── 内側ドロップ: ドロップ先の子タブにする ───
+        state.lastMovedTabIds = [dragTabId];
         await sendMessage('SET_TAB_PARENT', { tabId: dragTabId, parentId: tab.id });
 
         if (currentDraggedTab.windowId === currentTargetTab.windowId) {
@@ -2012,7 +2302,7 @@ function setupDragAndDrop(item, tab) {
       }
     } catch (err) {
       console.error('Failed to reorder tab:', err);
-      showToast('タブの移動に失敗しました', 'error');
+      showToast(chrome.i18n.getMessage('toastTabReorderFailed'), 'error');
     } finally {
       await refreshTabTree();
     }
@@ -2101,16 +2391,25 @@ async function refreshTabTree() {
 document.getElementById('btn-new-tab').addEventListener('click', () => {
   sendMessage('NEW_TAB', {});
 });
-
-document.getElementById('btn-collapse-all').addEventListener('click', collapseAll);
-document.getElementById('btn-expand-all').addEventListener('click', expandAll);
+document.getElementById('btn-toggle-close-on-select').addEventListener('click', () => {
+  state.userSettings.closeOnSelect = !state.userSettings.closeOnSelect;
+  saveUserSettings();
+  applyCloseOnSelectUI();
+});
+document.getElementById('btn-toggle-selection-animation').addEventListener('click', () => {
+  state.userSettings.tabSelectionAnimation = !state.userSettings.tabSelectionAnimation;
+  saveUserSettings();
+  applyTabSelectionAnimationUI();
+});
+document.getElementById('btn-toggle-all').addEventListener('click', toggleAllCollapse);
 
 // 以前のボタンは削除（セクションヘッダーがトグルになったため）
 
-document.getElementById('btn-save-session').addEventListener('click', () => {
+document.getElementById('btn-sessions').addEventListener('click', async () => {
   const input = document.getElementById('session-name-input');
-  input.value = `セッション ${new Date().toLocaleString('ja-JP')}`;
-  openModal('modal-save-session');
+  input.value = `${chrome.i18n.getMessage('sessionText')} ${new Date().toLocaleString()}`;
+  openModal('modal-sessions');
+  loadSessionList();
   setTimeout(() => input.focus(), 100);
 });
 
@@ -2118,16 +2417,13 @@ document.getElementById('btn-confirm-save').addEventListener('click', async () =
   const name = document.getElementById('session-name-input').value.trim();
   try {
     await sendMessage('SAVE_SESSION', { name: name || undefined });
-    closeModal('modal-save-session');
+    // 保存後、リストを再読み込みして入力を初期化
+    loadSessionList();
+    document.getElementById('session-name-input').value = `${chrome.i18n.getMessage('sessionText')} ${new Date().toLocaleString()}`;
     showToast(chrome.i18n.getMessage('toastSessionSaved'), 'success');
   } catch (e) {
     showToast(chrome.i18n.getMessage('toastSessionSaveFailed'), 'error');
   }
-});
-
-document.getElementById('btn-load-session').addEventListener('click', async () => {
-  openModal('modal-load-session');
-  await loadSessionList();
 });
 
 async function loadSessionList() {
@@ -2156,9 +2452,9 @@ async function loadSessionList() {
         </div>
         <div class="session-info">
           <div class="session-name">${escapeHtml(session.name)}</div>
-          <div class="session-meta">${session.tabs.length}タブ・${formatTime(session.createdAt)}</div>
+          <div class="session-meta">${session.tabs.length} ${chrome.i18n.getMessage('tabsText')} | ${formatTime(session.createdAt)}</div>
         </div>
-        <button class="session-delete" data-id="${session.id}" title="削除">
+        <button class="session-delete" data-id="${session.id}" title="${chrome.i18n.getMessage('ctxDelete')}">
           <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
         </button>
       `;
@@ -2327,7 +2623,7 @@ function renderHistory(items, query = '', recentSessions = []) {
           <div class="history-url">${url}</div>
         </div>
         <div class="history-time">${formatTime(item.lastVisitTime)}</div>
-        <button class="history-remove" title="削除">
+        <button class="history-remove" title="${chrome.i18n.getMessage('ctxDelete')}">
           <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
         </button>
       `;
@@ -2337,6 +2633,10 @@ function renderHistory(items, query = '', recentSessions = []) {
         chrome.tabs.create({ url: item.url });
         // 最近使用したブックマーク更新
         updateRecentlyUsed(item.url);
+
+        if (state.userSettings.closeOnSelect) {
+          window.close();
+        }
       });
 
       el.querySelector('.history-remove').addEventListener('click', async (e) => {
@@ -2411,17 +2711,46 @@ async function loadBookmarks() {
   }
 }
 
-function flattenBookmarks(nodes, folderPath = '') {
+function flattenBookmarks(nodes, pathObjects = []) {
   const result = [];
   nodes.forEach(node => {
     if (node.url) {
-      result.push({ ...node, folderPath });
+      result.push({ ...node, pathObjects });
     } else if (node.children) {
-      const path = folderPath ? `${folderPath} / ${node.title}` : (node.title || '');
-      result.push(...flattenBookmarks(node.children, path));
+      const newPath = [...pathObjects, { id: node.id, title: node.title }];
+      result.push(...flattenBookmarks(node.children, newPath));
     }
   });
   return result;
+}
+
+function navigateToBookmarkFolder(folderId, pathIds) {
+  state.bookmarkSortMode = 'tree';
+  // すべての親フォルダを展開状態にする
+  pathIds.forEach(id => {
+    state.bookmarkFolderState[id] = false; // collapsed = false
+  });
+  state.bookmarkFolderState[folderId] = false;
+
+  // UIのソートボタン状態を更新
+  document.querySelectorAll('.sort-btn').forEach(btn => {
+    if (btn.parentNode.id === 'bookmark-sort-modes') {
+      btn.classList.toggle('active', btn.dataset.sort === 'tree');
+    }
+  });
+
+  renderBookmarks();
+
+  // スクロール
+  setTimeout(() => {
+    const folderHeader = document.querySelector(`.bookmark-folder-header[data-folder-id="${folderId}"]`);
+    if (folderHeader) {
+      folderHeader.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 一時的にハイライト
+      folderHeader.style.background = 'var(--bg-active)';
+      setTimeout(() => { folderHeader.style.background = ''; }, 1000);
+    }
+  }, 100);
 }
 
 function updateRecentlyUsed(url) {
@@ -2469,7 +2798,7 @@ function renderBookmarks() {
   if (items.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>
-      <p>ブックマークが見つかりません</p>
+      <p>${chrome.i18n.getMessage('emptyBookmarks')}</p>
     </div>`;
     return;
   }
@@ -2490,7 +2819,7 @@ function createBookmarkItem(item, query = '') {
   if (state.bookmarkSortMode === 'most-visited') {
     if (state.userSettings.bookmarkVisitCount) {
       const count = state.visitCountMap[item.url] || 0;
-      dateStr = count > 0 ? `${count.toLocaleString()}回` : '';
+      dateStr = count > 0 ? chrome.i18n.getMessage('bookmarkCount', [count.toLocaleString()]) : '';
     } else {
       dateStr = '';
     }
@@ -2506,20 +2835,41 @@ function createBookmarkItem(item, query = '') {
     }
     <div class="bookmark-info">
       <div class="bookmark-title">${title}</div>
-      ${(state.bookmarkSortMode !== 'tree' && item.folderPath) ? `<div class="bookmark-path" title="${escapeHtml(item.folderPath)}">
-        <svg viewBox="0 0 20 20" fill="currentColor">
-          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-        </svg>
-        <span>${escapeHtml(item.folderPath)}</span>
-      </div>` : ''}
+      ${(state.bookmarkSortMode !== 'tree' && item.pathObjects && item.pathObjects.length > 0) ? `
+        <div class="bookmark-path">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+          </svg>
+          <div class="breadcrumb-list">
+            ${item.pathObjects.map((p, idx) => `
+              <span class="breadcrumb-link" data-folder-id="${p.id}" data-idx="${idx}">${escapeHtml(p.title)}</span>
+              ${idx < item.pathObjects.length - 1 ? '<span class="breadcrumb-separator">/</span>' : ''}
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
       <div class="bookmark-url">${escapeHtml(item.url)}</div>
     </div>
     ${dateStr ? `<div class="bookmark-date">${escapeHtml(dateStr)}</div>` : ''}
   `;
 
-  el.addEventListener('click', () => {
+  el.addEventListener('click', (e) => {
+    const breadcrumb = e.target.closest('.breadcrumb-link');
+    if (breadcrumb) {
+      e.stopPropagation();
+      const folderId = breadcrumb.dataset.folderId;
+      const idx = parseInt(breadcrumb.dataset.idx);
+      const pathIds = item.pathObjects.slice(0, idx).map(p => p.id);
+      navigateToBookmarkFolder(folderId, pathIds);
+      return;
+    }
+
     chrome.tabs.create({ url: item.url });
     updateRecentlyUsed(item.url);
+
+    if (state.userSettings.closeOnSelect) {
+      window.close();
+    }
   });
 
   el.addEventListener('contextmenu', (e) => {
@@ -2542,9 +2892,9 @@ function createBookmarkItem(item, query = '') {
         label: chrome.i18n.getMessage('ctxEdit'),
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
         action: async () => {
-          const newTitle = prompt('新しいタイトルを入力してください:', item.title);
+          const newTitle = prompt(chrome.i18n.getMessage('promptNewTitle'), item.title);
           if (newTitle === null) return;
-          const newUrl = prompt('新しいURLを入力してください:', item.url);
+          const newUrl = prompt(chrome.i18n.getMessage('promptNewUrl'), item.url);
           if (newUrl === null) return;
 
           try {
@@ -2563,7 +2913,7 @@ function createBookmarkItem(item, query = '') {
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
         danger: true,
         action: async () => {
-          if (confirm(`「${item.title || item.url}」を削除しますか？`)) {
+          if (confirm(chrome.i18n.getMessage('confirmDeleteBookmark', [item.title || item.url]))) {
             try {
               await chrome.bookmarks.remove(item.id);
               showToast(chrome.i18n.getMessage('toastBookmarkDeleted'), 'success');
@@ -2593,10 +2943,16 @@ function renderBookmarkTree(container, nodes) {
         parentEl.appendChild(el);
       } else if (node.children && node.children.length > 0 && node.title !== undefined) {
         const folderEl = document.createElement('div');
-        folderEl.className = `bookmark-folder ${state.bookmarkFolderState[node.id] ? 'collapsed' : ''}`;
+        // デフォルト設定：ルート(depth 0)は展開、それ以外は折りたたみ
+        const isCollapsed = state.bookmarkFolderState[node.id] !== undefined
+          ? state.bookmarkFolderState[node.id]
+          : depth > 0;
+
+        folderEl.className = `bookmark-folder ${isCollapsed ? 'collapsed' : ''}`;
 
         const header = document.createElement('div');
         header.className = 'bookmark-folder-header';
+        header.dataset.folderId = node.id;
         header.style.paddingLeft = `${depth * 12 + 4}px`;
         header.innerHTML = `
           <div class="bookmark-folder-toggle">
@@ -2611,8 +2967,11 @@ function renderBookmarkTree(container, nodes) {
           <span class="bookmark-folder-count">${countBookmarks(node.children)}</span>
         `;
         header.addEventListener('click', () => {
-          state.bookmarkFolderState[node.id] = !state.bookmarkFolderState[node.id];
-          folderEl.classList.toggle('collapsed', state.bookmarkFolderState[node.id]);
+          const currentlyCollapsed = state.bookmarkFolderState[node.id] !== undefined
+            ? state.bookmarkFolderState[node.id]
+            : depth > 0;
+          state.bookmarkFolderState[node.id] = !currentlyCollapsed;
+          folderEl.classList.toggle('collapsed', !currentlyCollapsed);
         });
         folderEl.appendChild(header);
 
@@ -2704,7 +3063,7 @@ async function loadReadingList() {
     const entries = await chrome.readingList.query({});
     renderReadingList(entries);
   } catch (e) {
-    container.innerHTML = `<div class="empty-state"><p>リーディングリストの読み込みに失敗しました</p></div>`;
+    container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyReadingListLoadFail')}</p></div>`;
   }
 }
 
@@ -2724,7 +3083,7 @@ function renderReadingList(entries) {
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 12h5v2h-5zM10 9h5v2h-5zM10 6h5v2h-5zM9 13v-1H4a1 1 0 01-1-1V5a1 1 0 011-1h5V3a1 1 0 011-1h6a1 1 0 011 1v10a1 1 0 01-1 1h-6a1 1 0 01-1-1zM5 11h3V5H5v6z"/></svg>
-      <p>リーディングリストは空です</p>
+      <p>${chrome.i18n.getMessage('emptyReadingList')}</p>
     </div>`;
     return;
   }
@@ -2751,13 +3110,13 @@ function renderReadingList(entries) {
         <div class="history-url">${highlightText(entry.url, readingListQuery)}</div>
       </div>
       <div class="reading-list-actions">
-        <button class="action-btn-sm toggle-read" title="${entry.hasBeenRead ? '未読にする' : '既読にする'}">
+        <button class="action-btn-sm toggle-read" title="${entry.hasBeenRead ? chrome.i18n.getMessage('toastReadingListMarkUnread') : chrome.i18n.getMessage('toastReadingListMarkRead')}">
           ${entry.hasBeenRead
         ? '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>'
         : '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>'
       }
         </button>
-        <button class="action-btn-sm remove-entry" title="削除">
+        <button class="action-btn-sm remove-entry" title="${chrome.i18n.getMessage('ctxDelete')}">
           <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
         </button>
       </div>
@@ -2836,16 +3195,37 @@ chrome.runtime.onMessage.addListener((message) => {
         el.classList.toggle('active-tab', Number(el.dataset.tabId) === message.tabId);
       });
       break;
+
+    case 'GOOGLE_TASKS_UPDATED':
+      refreshGoogleTasks();
+      break;
   }
 });
 
 // ===== 初期化 =====
 async function init() {
-  loadUserSettings();
-  loadTabConfig();
+  localizeHtmlPage();
+  await loadUserSettings();
+  await loadTabConfig();
   renderNavTabs();
   renderSettingsPanel();
+  applyColorScheme();
+  applyThemeColor(state.userSettings.themeColor || 'blue');
+  applyToggleSize();
+  applyFocusIntensity();
+  applyCloseOnSelectUI();
+  applyTabFontSize();
+  applyTabSelectionAnimationUI();
+  await refreshGoogleTasks();
   await loadTabs();
+}
+
+async function refreshGoogleTasks() {
+  try {
+    const res = await sendMessage('GET_GOOGLE_TASKS');
+    state.googleTasks = res.tasks || {};
+    renderTabs();
+  } catch (e) { }
 }
 
 init().catch(console.error);
@@ -2853,6 +3233,7 @@ init().catch(console.error);
 
 // ===== i18n Localization =====
 function localizeHtmlPage() {
+  document.documentElement.lang = chrome.i18n.getUILanguage().split('-')[0];
   document.querySelectorAll('[data-i18n]').forEach(el => {
     el.innerHTML = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
   });
@@ -2863,4 +3244,82 @@ function localizeHtmlPage() {
     el.placeholder = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
   });
 }
-document.addEventListener('DOMContentLoaded', localizeHtmlPage);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', localizeHtmlPage);
+} else {
+  localizeHtmlPage();
+}
+let recentTimeUpdateInterval = null;
+function startRecentTimeUpdateTimer() {
+  if (recentTimeUpdateInterval) return;
+  recentTimeUpdateInterval = setInterval(() => {
+    if (state.tabSortMode === 'recent') {
+      renderTabTree();
+    }
+  }, 10000); // 10秒おきに再描画
+}
+function stopRecentTimeUpdateTimer() {
+  if (recentTimeUpdateInterval) {
+    clearInterval(recentTimeUpdateInterval);
+    recentTimeUpdateInterval = null;
+  }
+}
+
+function applyToggleSize() {
+  const size = state.userSettings.toggleSize || 'medium';
+  document.body.setAttribute('data-toggle-size', size);
+}
+
+function applyFocusIntensity() {
+  const intensity = state.userSettings.focusIntensity || 'medium';
+  document.body.setAttribute('data-focus-intensity', intensity);
+}
+
+function applyCloseOnSelectUI() {
+  const isEnabled = !!state.userSettings.closeOnSelect;
+  const btn = document.getElementById('btn-toggle-close-on-select');
+  if (btn) {
+    btn.classList.toggle('active', isEnabled);
+  }
+  const cb = document.getElementById('setting-close-on-select');
+  if (cb) {
+    cb.checked = isEnabled;
+  }
+}
+
+function applyTabFontSize() {
+  const size = state.userSettings.tabFontSize || 12;
+  document.body.style.setProperty('--tab-font-size', `${size}px`);
+  document.body.style.setProperty('--tab-url-font-size', `${Math.max(10, size - 2)}px`);
+}
+
+function applyTabSelectionAnimationUI() {
+  const isEnabled = state.userSettings.tabSelectionAnimation !== false; // default true
+  const btn = document.getElementById('btn-toggle-selection-animation');
+  if (btn) {
+    btn.classList.toggle('active', isEnabled);
+  }
+  const cb = document.getElementById('setting-tab-selection-animation');
+  if (cb) {
+    cb.checked = isEnabled;
+  }
+  if (isEnabled) {
+    document.body.classList.remove('disable-selection-animation');
+  } else {
+    document.body.classList.add('disable-selection-animation');
+  }
+}
+
+// サイドパネルのフォーカス状態を管理
+function updateFocusState() {
+  if (document.hasFocus()) {
+    document.body.classList.add('sidepanel-focused');
+  } else {
+    document.body.classList.remove('sidepanel-focused');
+  }
+}
+
+window.addEventListener('focus', updateFocusState);
+window.addEventListener('blur', updateFocusState);
+// 初期実行
+updateFocusState();

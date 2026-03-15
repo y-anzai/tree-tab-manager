@@ -242,7 +242,7 @@ function renderNode(node, depth, isLast = false, parentIsLast = []) {
       </div>`;
 
   // タイトル
-  html += `<span class="ttm-mt-title" title="${escHtml(node.title)}">${escHtml(node.title || '(無題)')}</span>`;
+  html += `<span class="ttm-mt-title" title="${escHtml(node.title)}">${escHtml(node.title || chrome.i18n.getMessage('titleUntitled'))}</span>`;
 
   html += `</div>`; // .ttm-mt-content 終了
 
@@ -270,7 +270,7 @@ function renderTree(roots) {
     const isLast = idx === roots.length - 1;
     html += renderNode(r, 0, isLast, []);
   });
-  container.innerHTML = html || '<div class="ttm-mt-empty">タブなし</div>';
+  container.innerHTML = html || `<div class="ttm-mt-empty">${chrome.i18n.getMessage('emptyTabs')}</div>`;
 
   const items = container.querySelectorAll('.ttm-mt-item');
   items.forEach(el => {
@@ -486,8 +486,8 @@ function createMiniTree() {
     <div id="ttm-mt-panel">
       <div id="ttm-mt-resizer"></div>
       <div id="ttm-mt-header">
-        <span id="ttm-mt-title">Tabs</span>
-        <button id="ttm-mt-close" title="閉じる">
+        <span id="ttm-mt-title">${chrome.i18n.getMessage('navTabs')}</span>
+        <button id="ttm-mt-close" title="${chrome.i18n.getMessage('ctxClose')}">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
           </svg>

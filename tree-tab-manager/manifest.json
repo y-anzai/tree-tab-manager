@@ -14,7 +14,8 @@
     "sidePanel",
     "scripting",
     "readingList",
-    "favicon"
+    "favicon",
+    "identity"
   ],
   "commands": {
     "_execute_action": {
@@ -25,7 +26,7 @@
       "description": "__MSG_shortcutToggle__"
     }
   },
-  "content_scripts": [
+  "__content_scripts": [
     {
       "matches": [
         "<all_urls>"
@@ -60,5 +61,11 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "oauth2": {
+    "client_id": "1015811003439-voe4ooenkr68lis3hhs1dpoajrefum2k.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/tasks"
+    ]
   }
 }

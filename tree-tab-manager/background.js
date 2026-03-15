@@ -5,6 +5,167 @@ const tabParentMap = new Map();
 // タブのカスタムツリー情報 (tabId -> { collapsed, customParent })
 const tabMetadata = new Map();
 
+// 保存用キー
+const STORAGE_KEY_PARENTS = 'ttm-tab-parents';
+const STORAGE_KEY_METADATA = 'ttm-tab-metadata';
+
+// Google Tasks キャッシュ (url -> listName)
+let googleTasksCache = new Map();
+
+// 起動時にデータをロード
+async function loadTreeData() {
+  const data = await chrome.storage.local.get([STORAGE_KEY_PARENTS, STORAGE_KEY_METADATA, 'ttm-last-tab-state', 'ttm-google-tasks-cache']);
+  const savedParents = data[STORAGE_KEY_PARENTS] || {};
+  const savedMetadata = data[STORAGE_KEY_METADATA] || {};
+  const lastState = data['ttm-last-tab-state'] || [];
+
+  if (data['ttm-google-tasks-cache']) {
+    googleTasksCache = new Map(Object.entries(data['ttm-google-tasks-cache']));
+  }
+
+  const currentTabs = await chrome.tabs.query({});
+  const tabIds = new Set(currentTabs.map(t => t.id));
+
+  // 1. IDがそのまま生きているかチェック (拡張機能の再読込ケース)
+  const isIdStable = lastState.length > 0 && lastState.some(t => tabIds.has(t.id));
+
+  if (isIdStable) {
+    console.log('[TTM] IDs are stable. Loading mapping directly.');
+    for (const [id, parentId] of Object.entries(savedParents)) {
+      tabParentMap.set(parseInt(id), parentId);
+    }
+    for (const [id, meta] of Object.entries(savedMetadata)) {
+      tabMetadata.set(parseInt(id), meta);
+    }
+  } else if (lastState.length > 0) {
+    // 2. ブラウザ再起動などでIDが書き換わっているケースの復旧
+    console.log('[TTM] Browser restart detected. Attempting to recover tree via heuristics...');
+    const oldToNewMap = new Map();
+    const unmatchedNewTabs = [...currentTabs];
+
+    // ヒューリスティックマッチング (URL + Title + Index)
+    lastState.forEach(oldTab => {
+      const matchIdx = unmatchedNewTabs.findIndex(t =>
+        t.url === oldTab.url &&
+        t.title === oldTab.title &&
+        t.index === oldTab.index
+      );
+      if (matchIdx !== -1) {
+        const newTab = unmatchedNewTabs.splice(matchIdx, 1)[0];
+        oldToNewMap.set(oldTab.id, newTab.id);
+      }
+    });
+
+    // 緩いマッチング (URLのみ)
+    if (unmatchedNewTabs.length > 0) {
+      lastState.forEach(oldTab => {
+        if (oldToNewMap.has(oldTab.id)) return;
+        const matchIdx = unmatchedNewTabs.findIndex(t => t.url === oldTab.url);
+        if (matchIdx !== -1) {
+          const newTab = unmatchedNewTabs.splice(matchIdx, 1)[0];
+          oldToNewMap.set(oldTab.id, newTab.id);
+        }
+      });
+    }
+
+    // マッピングに基づいて親子関係とメタデータを復元
+    for (const [oldId, oldParentId] of Object.entries(savedParents)) {
+      const newId = oldToNewMap.get(parseInt(oldId));
+      const newParentId = oldToNewMap.get(oldParentId);
+      if (newId && newParentId) {
+        tabParentMap.set(newId, newParentId);
+      }
+    }
+    for (const [oldId, meta] of Object.entries(savedMetadata)) {
+      const newId = oldToNewMap.get(parseInt(oldId));
+      if (newId) {
+        tabMetadata.set(newId, meta);
+      }
+    }
+  }
+
+  // 存在しないタブのクリーンアップ
+  for (const id of tabParentMap.keys()) {
+    if (!tabIds.has(id)) tabParentMap.delete(id);
+  }
+  for (const id of tabMetadata.keys()) {
+    if (!tabIds.has(id)) tabMetadata.delete(id);
+  }
+  console.log(`[TTM] Tree recovered: ${tabParentMap.size} relationships`);
+}
+
+// データを保存
+async function saveTreeData() {
+  const tabs = await chrome.tabs.query({});
+  const tabState = tabs.map(t => ({
+    id: t.id,
+    url: t.url,
+    title: t.title,
+    index: t.index,
+    windowId: t.windowId
+  }));
+
+  await chrome.storage.local.set({
+    [STORAGE_KEY_PARENTS]: Object.fromEntries(tabParentMap),
+    [STORAGE_KEY_METADATA]: Object.fromEntries(tabMetadata),
+    'ttm-last-tab-state': tabState
+  });
+}
+
+// 初期化実行
+loadTreeData();
+
+// Google Tasks 同期
+async function fetchGoogleTasks() {
+  try {
+    const token = await new Promise((resolve) => {
+      chrome.identity.getAuthToken({ interactive: false }, (t) => {
+        if (chrome.runtime.lastError) resolve(null);
+        else resolve(t);
+      });
+    });
+    if (!token) return;
+
+    const listsRes = await fetch('https://www.googleapis.com/tasks/v1/users/@me/lists', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const lists = await listsRes.json();
+    if (!lists.items) return;
+
+    const newCache = new Map();
+    for (const list of lists.items) {
+      const tasksRes = await fetch(`https://www.googleapis.com/tasks/v1/lists/${list.id}/tasks`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const tasks = await tasksRes.json();
+      if (tasks.items) {
+        tasks.items.forEach(task => {
+          const urlMatch = (task.notes || task.title || '').match(/https?:\/\/[^\s]+/);
+          if (urlMatch) {
+            newCache.set(urlMatch[0], {
+              listName: list.title,
+              listId: list.id,
+              taskId: task.id,
+              status: task.status // 'needsAction' or 'completed'
+            });
+          }
+        });
+      }
+    }
+    googleTasksCache = newCache;
+    await chrome.storage.local.set({ 'ttm-google-tasks-cache': Object.fromEntries(newCache) });
+    notifyPanels({ type: 'GOOGLE_TASKS_UPDATED' });
+  } catch (e) {
+    console.error('[TTM] Google Tasks fetch failed:', e);
+  }
+}
+
+// 定期同期と初期同期
+setInterval(fetchGoogleTasks, 3600000);
+setTimeout(fetchGoogleTasks, 5000);
+
+loadTreeData();
+
 // 拡張機能のインストール/起動時にサイドパネルを設定
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -16,50 +177,107 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 // コマンドリスナー（ショートカットキー）
-chrome.commands.onCommand.addListener(async (command) => {
-  if (command === 'toggle-mini-tree') {
-    // アクティブタブにトグルメッセージを送信
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!activeTab) return;
-    // chrome:// や about: ページはコンテンツスクリプト不可
-    if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
-    chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
-  }
-});
+// chrome.commands.onCommand.addListener(async (command) => {
+//   if (command === 'toggle-mini-tree') {
+//     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+//     if (!activeTab) return;
+//     if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
+//     chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
+//   }
+// });
 
 // タブ作成時に親子関係を記録
-chrome.tabs.onCreated.addListener((tab) => {
-  if (tab.openerTabId !== undefined) {
-    tabParentMap.set(tab.id, tab.openerTabId);
+chrome.tabs.onCreated.addListener(async (tab) => {
+  let parentId = tab.openerTabId;
+
+  // リンクを踏んだ場合の親子関係を捕捉するためのヒューリスティック
+  // openerTabId が無い場合、現在同一ウィンドウでアクティブなタブを親候補とする
+  if (parentId === undefined) {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
+      if (activeTab && activeTab.id !== tab.id && activeTab.url && !activeTab.url.startsWith('chrome://')) {
+        parentId = activeTab.id;
+      }
+    } catch (e) {
+      console.error('[TTM] Failed to query active tab for parent heuristic:', e);
+    }
   }
+
+  if (parentId !== undefined) {
+    tabParentMap.set(tab.id, parentId);
+  }
+
   // メタデータ初期化
   tabMetadata.set(tab.id, { collapsed: false });
+
+  // 保存
+  await saveTreeData();
+
   // サイドパネルに通知
   notifyPanels({ type: 'TAB_CREATED', tabId: tab.id });
+
+  // ツリーモードなら物理的な並び替えを同期
+  const res = await chrome.storage.local.get('ttm-tab-sort-mode');
+  if (res['ttm-tab-sort-mode'] === 'tree') {
+    await syncPhysicalTabsWithTree();
+  }
 });
 
 // タブ更新時に通知
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl || 'groupId' in changeInfo) {
+    // グループが変更された場合、すべての子孫も同じグループに入れる（ユーザーリクエスト）
+    if ('groupId' in changeInfo) {
+      const descendants = getDescendantIds(tabId);
+      if (descendants.length > 0) {
+        try {
+          if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+            await chrome.tabs.ungroup(descendants);
+          } else {
+            await chrome.tabs.group({
+              groupId: changeInfo.groupId,
+              tabIds: descendants
+            });
+          }
+        } catch (e) {
+          console.error('[TTM] Failed to sync descendant groups:', e);
+        }
+      }
+    }
     notifyPanels({ type: 'TAB_UPDATED', tabId, changeInfo });
   }
 });
 
+// 子孫タブのIDをすべて取得（再帰）
+function getDescendantIds(tabId) {
+  let ids = [];
+  for (const [childId, parentId] of tabParentMap.entries()) {
+    if (parentId === tabId) {
+      ids.push(childId);
+      ids = ids.concat(getDescendantIds(childId));
+    }
+  }
+  return ids;
+}
+
 // タブ削除時に親子関係をクリーンアップ
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  const currentParentId = tabParentMap.get(tabId);
   tabParentMap.delete(tabId);
   tabMetadata.delete(tabId);
+
   // 削除されたタブの子タブの親を削除タブの親に変更（リフト）
   for (const [childId, parentId] of tabParentMap.entries()) {
     if (parentId === tabId) {
-      const grandParent = tabParentMap.get(tabId);
-      if (grandParent !== undefined) {
-        tabParentMap.set(childId, grandParent);
+      if (currentParentId !== undefined) {
+        tabParentMap.set(childId, currentParentId);
       } else {
         tabParentMap.delete(childId);
       }
     }
   }
+
+  saveTreeData(); // 非同期で保存
   notifyPanels({ type: 'TAB_REMOVED', tabId });
 });
 
@@ -96,6 +314,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } else {
         tabParentMap.set(message.tabId, message.parentId);
       }
+      saveTreeData();
       notifyPanels({ type: 'TREE_UPDATED' });
       sendResponse({ success: true });
       break;
@@ -107,6 +326,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'SET_TAB_COLLAPSED':
       const meta = tabMetadata.get(message.tabId) || {};
       tabMetadata.set(message.tabId, { ...meta, collapsed: message.collapsed });
+      saveTreeData();
       sendResponse({ success: true });
       break;
 
@@ -132,10 +352,145 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           // NEW_TAB ハンドラ側で明示的に親子関係を設定する
           if (message.openerTabId) {
             tabParentMap.set(tab.id, message.openerTabId);
+            saveTreeData();
           }
           notifyPanels({ type: 'TREE_UPDATED' });
           sendResponse({ tab });
         });
+      return true;
+
+    case 'GET_GOOGLE_TASKS':
+      sendResponse({ tasks: Object.fromEntries(googleTasksCache) });
+      break;
+
+    case 'GET_TASK_LISTS':
+      (async () => {
+        try {
+          const token = await new Promise((resolve, reject) => {
+            chrome.identity.getAuthToken({ interactive: false }, (t) => {
+              if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+              else resolve(t);
+            });
+          });
+          const res = await fetch('https://www.googleapis.com/tasks/v1/users/@me/lists', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          sendResponse({ success: true, lists: data.items || [] });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      return true;
+
+    case 'TOGGLE_GOOGLE_TASK_STATUS':
+      (async () => {
+        try {
+          const token = await new Promise((resolve, reject) => {
+            chrome.identity.getAuthToken({ interactive: false }, (t) => {
+              if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+              else resolve(t);
+            });
+          });
+          const { listId, taskId, status } = message;
+          const newStatus = status === 'completed' ? 'needsAction' : 'completed';
+
+          const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              status: newStatus,
+              completed: newStatus === 'completed' ? new Date().toISOString() : null
+            })
+          });
+
+          if (!res.ok) throw new Error('Failed to update task status');
+          const updatedTask = await res.json();
+
+          // キャッシュ更新
+          for (const [url, info] of googleTasksCache.entries()) {
+            if (info.taskId === taskId) {
+              info.status = updatedTask.status;
+              break;
+            }
+          }
+          await chrome.storage.local.set({ 'ttm-google-tasks-cache': Object.fromEntries(googleTasksCache) });
+          notifyPanels({ type: 'GOOGLE_TASKS_UPDATED' });
+
+          sendResponse({ success: true, status: updatedTask.status });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      return true;
+
+    case 'ADD_TO_GOOGLE_TODO':
+      (async () => {
+        try {
+          const token = await new Promise((resolve, reject) => {
+            console.log('[TTM] Requesting auth token...');
+            chrome.identity.getAuthToken({ interactive: true }, (t) => {
+              if (chrome.runtime.lastError) {
+                console.error('[TTM] Auth token error:', chrome.runtime.lastError);
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                console.log('[TTM] Auth token received');
+                resolve(t);
+              }
+            });
+          });
+
+          const listsRes = await fetch('https://www.googleapis.com/tasks/v1/users/@me/lists', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const lists = await listsRes.json();
+
+          let targetListId = message.listId;
+          let targetListTitle = '';
+
+          if (!targetListId) {
+            const defaultList = lists.items?.[0];
+            if (!defaultList) throw new Error('No list found');
+            targetListId = defaultList.id;
+            targetListTitle = defaultList.title;
+          } else {
+            const list = lists.items.find(l => l.id === targetListId);
+            targetListTitle = list ? list.title : 'Task';
+          }
+
+          const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/${targetListId}/tasks`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              title: message.title,
+              notes: message.url
+            })
+          });
+
+          if (!res.ok) throw new Error('Failed to create task');
+          const newTask = await res.json();
+
+          googleTasksCache.set(message.url, {
+            listName: targetListTitle,
+            listId: targetListId,
+            taskId: newTask.id,
+            status: newTask.status
+          });
+          await chrome.storage.local.set({ 'ttm-google-tasks-cache': Object.fromEntries(googleTasksCache) });
+          notifyPanels({ type: 'GOOGLE_TASKS_UPDATED' });
+
+          sendResponse({ success: true, listName: targetListTitle });
+        } catch (e) {
+          console.error('[TTM] Google Todo add failed:', e);
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
       return true;
 
     case 'GET_HISTORY':
@@ -162,41 +517,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       deleteSession(message.sessionId).then(() => sendResponse({ success: true }));
       return true;
 
-    case 'GET_MINI_TREE_DATA': {
-      // コンテンツスクリプト用: 現在ウィンドウのタブ一覧 + 親子関係を返す
-      chrome.tabs.query({ currentWindow: true }).then((tabs) => {
-        sendResponse({
-          tabs: tabs.map(t => ({
-            id: t.id,
-            title: t.title,
-            url: t.url,
-            favIconUrl: t.favIconUrl,
-            active: t.active,
-            pinned: t.pinned,
-            windowId: t.windowId,
-            index: t.index
-          })),
-          parents: Object.fromEntries(tabParentMap)
-        });
-      });
-      return true;
-    }
-
-    case 'MINI_TREE_ACTIVATE_TAB':
-      chrome.tabs.update(message.tabId, { active: true })
-        .then(() => chrome.windows.update(message.windowId, { focused: true }))
-        .then(() => sendResponse({ success: true }));
-      return true;
-
-    case 'MINI_TREE_TOGGLE_COLLAPSE':
-      // collapseStateはコンテンツスクリプト側で管理するため confirmだけ
-      sendResponse({ success: true });
-      break;
-
-    case 'MINI_TREE_MOVE_TAB':
-      chrome.tabs.move(message.tabId, { index: message.index })
-        .then(() => sendResponse({ success: true }));
-      return true;
+    /* cases for MINI_TREE deactivated */
+    // case 'GET_MINI_TREE_DATA': ...
+    // case 'MINI_TREE_ACTIVATE_TAB': ...
+    // case 'MINI_TREE_TOGGLE_COLLAPSE': ...
+    // case 'MINI_TREE_MOVE_TAB': ...
 
   }
   return false;
@@ -207,15 +532,10 @@ function notifyPanels(message) {
   chrome.runtime.sendMessage(message).catch(() => {
     // サイドパネルが開いていない場合はエラーを無視
   });
-  // ミニツリーが開いているタブにも通知
-  if (message.type === 'TREE_UPDATED' || message.type === 'TAB_CREATED' || message.type === 'TAB_REMOVED' || message.type === 'TAB_UPDATED' || message.type === 'TAB_ACTIVATED') {
-    chrome.tabs.query({ currentWindow: true }).then(tabs => {
-      tabs.forEach(tab => {
-        if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) return;
-        chrome.tabs.sendMessage(tab.id, { type: 'MINI_TREE_REFRESH', event: message }).catch(() => { });
-      });
-    });
-  }
+  // ミニツリーへの通知は非アクティブ化
+  /*
+  if (message.type === 'TREE_UPDATED' || message.type === 'TAB_CREATED' || ... ) { ... }
+  */
 }
 
 // セッション保存
