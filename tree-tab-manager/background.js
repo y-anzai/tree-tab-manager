@@ -5,6 +5,109 @@ const tabParentMap = new Map();
 // タブのカスタムツリー情報 (tabId -> { collapsed, customParent })
 const tabMetadata = new Map();
 
+// 保存用キー
+const STORAGE_KEY_PARENTS = 'ttm-tab-parents';
+const STORAGE_KEY_METADATA = 'ttm-tab-metadata';
+
+// 起動時にデータをロード
+async function loadTreeData() {
+  const data = await chrome.storage.local.get([STORAGE_KEY_PARENTS, STORAGE_KEY_METADATA, 'ttm-last-tab-state']);
+  const savedParents = data[STORAGE_KEY_PARENTS] || {};
+  const savedMetadata = data[STORAGE_KEY_METADATA] || {};
+  const lastState = data['ttm-last-tab-state'] || [];
+
+  const currentTabs = await chrome.tabs.query({});
+  const tabIds = new Set(currentTabs.map(t => t.id));
+
+  // 1. IDがそのまま生きているかチェック (拡張機能の再読込ケース)
+  const isIdStable = lastState.length > 0 && lastState.some(t => tabIds.has(t.id));
+
+  if (isIdStable) {
+    console.log('[TTM] IDs are stable. Loading mapping directly.');
+    for (const [id, parentId] of Object.entries(savedParents)) {
+      tabParentMap.set(parseInt(id), parentId);
+    }
+    for (const [id, meta] of Object.entries(savedMetadata)) {
+      tabMetadata.set(parseInt(id), meta);
+    }
+  } else if (lastState.length > 0) {
+    // 2. ブラウザ再起動などでIDが書き換わっているケースの復旧
+    console.log('[TTM] Browser restart detected. Attempting to recover tree via heuristics...');
+    const oldToNewMap = new Map();
+    const unmatchedNewTabs = [...currentTabs];
+
+    // ヒューリスティックマッチング (URL + Title + Index)
+    lastState.forEach(oldTab => {
+      const matchIdx = unmatchedNewTabs.findIndex(t =>
+        t.url === oldTab.url &&
+        t.title === oldTab.title &&
+        t.index === oldTab.index
+      );
+      if (matchIdx !== -1) {
+        const newTab = unmatchedNewTabs.splice(matchIdx, 1)[0];
+        oldToNewMap.set(oldTab.id, newTab.id);
+      }
+    });
+
+    // 緩いマッチング (URLのみ)
+    if (unmatchedNewTabs.length > 0) {
+      lastState.forEach(oldTab => {
+        if (oldToNewMap.has(oldTab.id)) return;
+        const matchIdx = unmatchedNewTabs.findIndex(t => t.url === oldTab.url);
+        if (matchIdx !== -1) {
+          const newTab = unmatchedNewTabs.splice(matchIdx, 1)[0];
+          oldToNewMap.set(oldTab.id, newTab.id);
+        }
+      });
+    }
+
+    // マッピングに基づいて親子関係とメタデータを復元
+    for (const [oldId, oldParentId] of Object.entries(savedParents)) {
+      const newId = oldToNewMap.get(parseInt(oldId));
+      const newParentId = oldToNewMap.get(oldParentId);
+      if (newId && newParentId) {
+        tabParentMap.set(newId, newParentId);
+      }
+    }
+    for (const [oldId, meta] of Object.entries(savedMetadata)) {
+      const newId = oldToNewMap.get(parseInt(oldId));
+      if (newId) {
+        tabMetadata.set(newId, meta);
+      }
+    }
+  }
+
+  // 存在しないタブのクリーンアップ
+  for (const id of tabParentMap.keys()) {
+    if (!tabIds.has(id)) tabParentMap.delete(id);
+  }
+  for (const id of tabMetadata.keys()) {
+    if (!tabIds.has(id)) tabMetadata.delete(id);
+  }
+  console.log(`[TTM] Tree recovered: ${tabParentMap.size} relationships`);
+}
+
+// データを保存
+async function saveTreeData() {
+  const tabs = await chrome.tabs.query({});
+  const tabState = tabs.map(t => ({
+    id: t.id,
+    url: t.url,
+    title: t.title,
+    index: t.index,
+    windowId: t.windowId
+  }));
+
+  await chrome.storage.local.set({
+    [STORAGE_KEY_PARENTS]: Object.fromEntries(tabParentMap),
+    [STORAGE_KEY_METADATA]: Object.fromEntries(tabMetadata),
+    'ttm-last-tab-state': tabState
+  });
+}
+
+// 初期化実行
+loadTreeData();
+
 // 拡張機能のインストール/起動時にサイドパネルを設定
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -48,6 +151,10 @@ chrome.tabs.onCreated.addListener(async (tab) => {
 
   // メタデータ初期化
   tabMetadata.set(tab.id, { collapsed: false });
+
+  // 保存
+  await saveTreeData();
+
   // サイドパネルに通知
   notifyPanels({ type: 'TAB_CREATED', tabId: tab.id });
 
@@ -111,6 +218,8 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
       }
     }
   }
+
+  saveTreeData(); // 非同期で保存
   notifyPanels({ type: 'TAB_REMOVED', tabId });
 });
 
@@ -147,6 +256,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } else {
         tabParentMap.set(message.tabId, message.parentId);
       }
+      saveTreeData();
       notifyPanels({ type: 'TREE_UPDATED' });
       sendResponse({ success: true });
       break;
@@ -158,6 +268,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'SET_TAB_COLLAPSED':
       const meta = tabMetadata.get(message.tabId) || {};
       tabMetadata.set(message.tabId, { ...meta, collapsed: message.collapsed });
+      saveTreeData();
       sendResponse({ success: true });
       break;
 
@@ -183,6 +294,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           // NEW_TAB ハンドラ側で明示的に親子関係を設定する
           if (message.openerTabId) {
             tabParentMap.set(tab.id, message.openerTabId);
+            saveTreeData();
           }
           notifyPanels({ type: 'TREE_UPDATED' });
           sendResponse({ tab });

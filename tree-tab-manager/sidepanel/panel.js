@@ -113,13 +113,13 @@ const MODE_ICONS = {
 };
 
 
-function applyDisplayMode(mode) {
+async function applyDisplayMode(mode) {
   DISPLAY_MODES.forEach(m => document.body.classList.remove(`mode-${m}`));
   document.body.classList.add(`mode-${mode}`);
   state.displayMode = mode;
-  try { localStorage.setItem('ttm-displayMode', mode); } catch { }
+  try { await chrome.storage.local.set({ 'ttm-displayMode': mode }); } catch { }
 
-  const btn = document.getElementById('btn-display-mode');
+  const btn = document.getElementById('btn-toggle-mini-tree') ? document.getElementById('btn-display-mode') : document.getElementById('btn-display-mode');
   if (!btn) return;
   btn.innerHTML = MODE_ICONS[mode];
 
@@ -448,23 +448,27 @@ function getDefaultFavicon() {
 // ===== ユーザー設定管理 =====
 
 
-function loadUserSettings() {
+async function loadUserSettings() {
   try {
-    const saved = localStorage.getItem('ttm-user-settings');
+    const data = await chrome.storage.local.get(['ttm-user-settings', 'ttm-displayMode']);
+    const saved = data['ttm-user-settings'];
     if (saved) {
-      const parsed = JSON.parse(saved);
+      const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
       state.userSettings = {
         ...state.userSettings,
         ...parsed,
         shortcuts: { ...state.userSettings.shortcuts, ...(parsed.shortcuts || {}) }
       };
-      // 旧設定からの移行: focusEffect (boolean) があれば focusIntensity に変換
+      // 旧設定からの移行
       if (parsed.focusEffect === false) state.userSettings.focusIntensity = 'none';
       if (parsed.focusEffect === true && !parsed.focusIntensity) state.userSettings.focusIntensity = 'medium';
     }
+    if (data['ttm-displayMode']) {
+      state.displayMode = data['ttm-displayMode'];
+    }
   } catch (e) { }
   applyColorScheme();
-  // 起動時にショートカットと位置設定、幅をcontent scriptが読めるようにsync
+  // 他のコンポーネント用への同期
   chrome.storage.local.set({
     'ttm-shortcuts': state.userSettings.shortcuts || {},
     'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
@@ -480,11 +484,10 @@ function saveUserSettingsDebounced() {
   }, 500);
 }
 
-function saveUserSettings() {
+async function saveUserSettings() {
   try {
-    localStorage.setItem('ttm-user-settings', JSON.stringify(state.userSettings));
-    // content scriptが読めるようにchrome.storage.localにも同期
-    chrome.storage.local.set({
+    await chrome.storage.local.set({
+      'ttm-user-settings': state.userSettings,
       'ttm-shortcuts': state.userSettings.shortcuts || {},
       'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
       'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
@@ -493,11 +496,12 @@ function saveUserSettings() {
 }
 
 // ===== タブナビゲーション設定管理 =====
-function loadTabConfig() {
+async function loadTabConfig() {
   try {
-    const saved = localStorage.getItem('ttm-tab-config');
+    const data = await chrome.storage.local.get(['ttm-tab-config']);
+    const saved = data['ttm-tab-config'];
     if (saved) {
-      const parsed = JSON.parse(saved);
+      const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
       // Ensure all defaults exist in parsed (in case of updates)
       const merged = parsed.filter(p => DEFAULT_TAB_CONFIG.some(d => d.id === p.id));
       DEFAULT_TAB_CONFIG.forEach(d => {
@@ -520,9 +524,9 @@ function loadTabConfig() {
   }
 }
 
-function saveTabConfig() {
+async function saveTabConfig() {
   try {
-    localStorage.setItem('ttm-tab-config', JSON.stringify(state.tabConfig));
+    await chrome.storage.local.set({ 'ttm-tab-config': state.tabConfig });
   } catch (e) {
     console.error('Failed to save tab config', e);
   }
@@ -3121,8 +3125,8 @@ chrome.runtime.onMessage.addListener((message) => {
 // ===== 初期化 =====
 async function init() {
   localizeHtmlPage();
-  loadUserSettings();
-  loadTabConfig();
+  await loadUserSettings();
+  await loadTabConfig();
   renderNavTabs();
   renderSettingsPanel();
   applyColorScheme();
