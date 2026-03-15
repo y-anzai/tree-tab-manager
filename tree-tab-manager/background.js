@@ -187,14 +187,34 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 // コマンドリスナー（ショートカットキー）
-// chrome.commands.onCommand.addListener(async (command) => {
-//   if (command === 'toggle-mini-tree') {
-//     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-//     if (!activeTab) return;
-//     if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
-//     chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
-//   }
-// });
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'toggle-mini-tree') {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!activeTab) return;
+    if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
+    chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
+  } else if (command === 'toggle-interaction-mode') {
+    const data = await chrome.storage.local.get('ttm-user-settings');
+    const settings = data['ttm-user-settings'] || {};
+    const currentMode = settings.interactionMode || 'sidepanel';
+    const newMode = currentMode === 'sidepanel' ? 'popup' : 'sidepanel';
+
+    settings.interactionMode = newMode;
+    await chrome.storage.local.set({ 'ttm-user-settings': settings });
+
+    // アクションの振る舞いを更新
+    if (newMode === 'popup') {
+      chrome.action.setPopup({ popup: 'sidepanel/popup.html' });
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => { });
+    } else {
+      chrome.action.setPopup({ popup: '' });
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
+    }
+
+    // パネルが開いている場合は通知
+    chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED', settings }).catch(() => { });
+  }
+});
 
 // タブ作成時に親子関係を記録
 chrome.tabs.onCreated.addListener(async (tab) => {
@@ -346,7 +366,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'ACTIVATE_TAB':
       chrome.tabs.update(message.tabId, { active: true })
-        .then(() => chrome.windows.update(message.windowId, { focused: true }))
+        .then(() => {
+          if (message.focusWindow !== false) {
+            return chrome.windows.update(message.windowId, { focused: true });
+          }
+        })
         .then(() => sendResponse({ success: true }));
       return true;
 
@@ -585,6 +609,23 @@ async function loadSessions() {
   const result = await chrome.storage.local.get('sessions');
   return result.sessions || [];
 }
+
+// 設定変更を監視して振る舞いを同期
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes['ttm-user-settings']) {
+    const newSettings = changes['ttm-user-settings'].newValue;
+    if (newSettings && newSettings.interactionMode) {
+      const mode = newSettings.interactionMode;
+      if (mode === 'popup') {
+        chrome.action.setPopup({ popup: 'sidepanel/popup.html' });
+        chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => { });
+      } else {
+        chrome.action.setPopup({ popup: '' });
+        chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
+      }
+    }
+  }
+});
 
 // セッション復元
 async function restoreSession(sessionId) {

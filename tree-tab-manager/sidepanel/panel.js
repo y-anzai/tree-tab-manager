@@ -55,25 +55,26 @@ const state = {
     tabFontSize: 12,
     toggleSize: 'medium',
     shortcuts: {
-      'new-tab': 'Alt+N',
-      'toggle-pinned': 'Alt+P',
-      'display-mode': 'Alt+D',
-      'sort-mode': 'Alt+S',
-      'collapse-all': 'Alt+Up',
-      'expand-all': 'Alt+Down',
-      'focus-search': '/',
-      'switch-tabs': 'Alt+1',
-      'switch-history': 'Alt+2',
-      'switch-bookmarks': 'Alt+3',
-      'switch-settings': 'Alt+4',
-      // 'toggle-mini-tree': 'Cmd+Shift+X'
+      'new-tab': '',
+      'toggle-pinned': '',
+      'display-mode': '',
+      'sort-mode': '',
+      'collapse-all': '',
+      'expand-all': '',
+      'focus-search': '',
+      'switch-tabs': '',
+      'switch-history': '',
+      'switch-bookmarks': '',
+      'switch-settings': '',
+      'display-mode': '',
     },
     interactionMode: 'sidepanel' // 'sidepanel' | 'popup'
   },
   isRecordingShortcut: false,
 
   // タブ管理・設定
-  tabConfig: []
+  tabConfig: [],
+  isFirstLoad: true
 };
 
 // ショートカット定義
@@ -82,14 +83,8 @@ const SHORTCUT_ACTIONS = [
   { id: 'switch-history', label: chrome.i18n.getMessage('actionSwitchHistory') },
   { id: 'switch-bookmarks', label: chrome.i18n.getMessage('actionSwitchBookmarks') },
   { id: 'switch-settings', label: chrome.i18n.getMessage('actionSwitchSettings') },
-  { id: 'new-tab', label: chrome.i18n.getMessage('actionNewTab') },
   { id: 'focus-search', label: chrome.i18n.getMessage('actionFocusSearch') },
-  { id: 'toggle-pinned', label: chrome.i18n.getMessage('actionTogglePinned') },
   { id: 'display-mode', label: chrome.i18n.getMessage('actionDisplayMode') },
-  { id: 'sort-mode', label: chrome.i18n.getMessage('actionSortMode') },
-  { id: 'collapse-all', label: chrome.i18n.getMessage('actionCollapseAll') },
-  { id: 'expand-all', label: chrome.i18n.getMessage('actionExpandAll') },
-  // { id: 'toggle-mini-tree', label: chrome.i18n.getMessage('actionToggleMiniTree') }
 ];
 
 // デフォルトのタブ設定
@@ -471,6 +466,10 @@ async function loadUserSettings() {
     if (data['ttm-displayMode']) {
       state.displayMode = data['ttm-displayMode'];
     }
+    const pinnedData = await chrome.storage.local.get(['ttm-show-pinned-tabs']);
+    if (pinnedData['ttm-show-pinned-tabs'] !== undefined) {
+      state.showPinnedTabs = pinnedData['ttm-show-pinned-tabs'];
+    }
   } catch (e) { }
   applyColorScheme();
   // 他のコンポーネント用への同期
@@ -495,7 +494,8 @@ async function saveUserSettings() {
       'ttm-user-settings': state.userSettings,
       'ttm-shortcuts': state.userSettings.shortcuts || {},
       'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
-      'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
+      'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90,
+      'ttm-show-pinned-tabs': state.showPinnedTabs
     });
 
     // アクションボタンの振る舞いを更新
@@ -568,6 +568,9 @@ function renderNavTabs() {
       const panel = document.getElementById(`panel-${tab.id}`);
       if (panel) panel.classList.add('active');
 
+      // アクティブなパネルを保存
+      chrome.storage.local.set({ 'ttm-active-panel': tab.id });
+
       if (tab.id === 'history') loadHistory();
       if (tab.id === 'bookmarks') loadBookmarks();
       if (tab.id === 'readingList') loadReadingList();
@@ -575,13 +578,24 @@ function renderNavTabs() {
     nav.appendChild(btn);
   });
 
-  // Ensure an active panel exists, fallback to first visible tab
-  if (!visibleTabs.some(t => t.id === currentActive) && visibleTabs.length > 0) {
-    const firstId = visibleTabs[0].id;
-    nav.querySelector(`[data-panel="${firstId}"]`).classList.add('active');
+  // 保存されたパネルを復元、またはデフォルト
+  chrome.storage.local.get(['ttm-active-panel'], (data) => {
+    const savedPanel = data['ttm-active-panel'];
+    const targetId = (savedPanel && visibleTabs.some(t => t.id === savedPanel)) ? savedPanel : (visibleTabs[0]?.id || 'tabs');
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(`panel-${firstId}`).classList.add('active');
-  }
+
+    const targetBtn = nav.querySelector(`[data-panel="${targetId}"]`);
+    if (targetBtn) targetBtn.classList.add('active');
+    const targetPanel = document.getElementById(`panel-${targetId}`);
+    if (targetPanel) targetPanel.classList.add('active');
+
+    // 初期ロード時の読み込み
+    if (targetId === 'history') loadHistory();
+    if (targetId === 'bookmarks') loadBookmarks();
+    if (targetId === 'readingList') loadReadingList();
+  });
 }
 
 // ===== 設定パネル =====
@@ -854,6 +868,43 @@ function renderShortcutsSettings() {
   if (!container) return;
   container.innerHTML = '';
 
+  // 内部ショートカットを先に描画（同期）
+  renderInternalShortcuts(container);
+
+  // 拡張機能自体の有効化やその他のグローバルショートカットを取得して先頭に挿入（非同期）
+  chrome.commands.getAll((commands) => {
+    // 逆順で先頭に追加（manifestの順序を維持気味に）
+    commands.slice().reverse().forEach(cmd => {
+      const globalItem = document.createElement('div');
+      globalItem.className = 'settings-item-normal';
+      globalItem.style.borderLeft = '4px solid var(--theme-color)';
+
+      let label = cmd.description;
+      if (!label && cmd.name === '_execute_action') label = chrome.i18n.getMessage('actionEnableExtension');
+
+      globalItem.innerHTML = `
+        <div class="settings-item-label">
+          <div style="display: flex; flex-direction: column;">
+            <span>${label || cmd.name}</span>
+            <span style="font-size: 10px; color: var(--text-muted); decoration: underline;">(Global Shortcut)</span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="shortcut-kbd-btn global-shortcut-btn">${cmd.shortcut || '---'}</span>
+          <button class="toolbar-btn primary" icon-only title="${chrome.i18n.getMessage('actionChangeShortcut')}">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+          </button>
+        </div>
+      `;
+      globalItem.querySelector('button').onclick = () => {
+        chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+      };
+      container.insertBefore(globalItem, container.firstChild);
+    });
+  });
+}
+
+function renderInternalShortcuts(container) {
   SHORTCUT_ACTIONS.forEach(action => {
     const item = document.createElement('div');
     item.className = 'settings-item-normal';
@@ -919,18 +970,12 @@ function renderShortcutsSettings() {
     resetBtn.onclick = () => {
       // デフォルトに戻す
       const defaults = {
-        'new-tab': 'Alt+N',
-        'toggle-pinned': 'Alt+P',
-        'display-mode': 'Alt+D',
-        'sort-mode': 'Alt+S',
-        'collapse-all': 'Alt+Up',
-        'expand-all': 'Alt+Down',
-        'focus-search': '/',
-        'switch-tabs': 'Alt+1',
-        'switch-history': 'Alt+2',
-        'switch-bookmarks': 'Alt+3',
-        'switch-settings': 'Alt+4',
-        'toggle-mini-tree': 'Cmd+Shift+X'
+        'switch-tabs': '',
+        'switch-history': '',
+        'switch-bookmarks': '',
+        'switch-settings': '',
+        'focus-search': '',
+        'display-mode': ''
       };
       state.userSettings.shortcuts[action.id] = defaults[action.id] || '';
       saveUserSettings();
@@ -1389,6 +1434,7 @@ function renderTabTree() {
 
     label.addEventListener('click', () => {
       state.showPinnedTabs = !state.showPinnedTabs;
+      saveUserSettings();
       renderTabTree();
     });
 
@@ -1504,11 +1550,6 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
         <polyline points="4 6 8 10 12 6"></polyline>
       </svg>
     </div>
-    <button class="tab-action-btn close-btn left-action" data-action="close" title="${chrome.i18n.getMessage('ctxClose')}">
-      <svg viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-      </svg>
-    </button>
     <div class="tab-content-wrapper">
       ${groupDotHtml}
       ${faviconUrl
@@ -1539,6 +1580,11 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
             <path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/>
           </svg>
         </button>` : ''}
+        <button class="tab-action-btn close-btn" data-action="close" title="${chrome.i18n.getMessage('ctxClose')}">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
         ${hasChildren ? (() => {
       const total = countDescendants(tab);
       return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="${chrome.i18n.getMessage('ctxCloseTree')} (${total + 1}${chrome.i18n.getMessage('tabsText')})">
@@ -1555,10 +1601,12 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     </div>
   `;
 
-  // アクティブタブにスクロール
+  /* 
+  // アクティブタブにスクロール (ユーザーリクエストにより、更新時の自動スクロールを無効化)
   if (tab.id === state.activeTabId) {
     setTimeout(() => item.scrollIntoView({ block: 'nearest' }), 100);
   }
+  */
 
   // クリックでタブをアクティブ化（親選択モード中は親を設定）
   item.addEventListener('click', (e) => {
@@ -2153,7 +2201,11 @@ async function activateTab(tabId, windowId) {
     state.tabActivationTime[tabId] = Date.now();
     try { localStorage.setItem(`ttm-tab-activation-${tabId}`, state.tabActivationTime[tabId]); } catch { }
 
-    await sendMessage('ACTIVATE_TAB', { tabId, windowId });
+    await sendMessage('ACTIVATE_TAB', {
+      tabId,
+      windowId,
+      focusWindow: !!state.userSettings.closeOnSelect
+    });
 
     // 設定が有効な場合、サイドパネルを閉じる
     if (state.userSettings.closeOnSelect) {
@@ -2445,13 +2497,44 @@ async function loadTabs() {
   }
 
   try {
-    const resp = await sendMessage('GET_TAB_PARENTS');
-    state.tabParents = resp?.parents || {};
+    const [parentsResp, metaResp] = await Promise.all([
+      sendMessage('GET_TAB_PARENTS'),
+      sendMessage('GET_TAB_METADATA')
+    ]);
+    state.tabParents = parentsResp?.parents || {};
+
+    // 折りたたみ状態を復元
+    const metadata = metaResp?.metadata || {};
+    Object.entries(metadata).forEach(([id, meta]) => {
+      if (meta.collapsed !== undefined) {
+        state.collapseState[id] = meta.collapsed;
+      }
+    });
   } catch {
     state.tabParents = {};
   }
 
   renderTabTree();
+
+  // 初回ロード時のみアクティブタブまでスクロール & 親を開く
+  if (state.isFirstLoad && state.activeTabId) {
+    state.isFirstLoad = false;
+    setTimeout(() => {
+      const activeItem = document.querySelector(`.tab-item[data-tab-id="${state.activeTabId}"]`);
+      if (activeItem) {
+        // 親を辿って展開
+        let parent = activeItem.closest('.tab-node')?.parentElement?.closest('.tab-node');
+        while (parent) {
+          const parentId = parent.dataset.tabId;
+          if (parentId && state.collapseState[parentId]) {
+            toggleTabCollapse(parentId); // 展開
+          }
+          parent = parent.parentElement?.closest('.tab-node');
+        }
+        activeItem.scrollIntoView({ block: 'nearest' });
+      }
+    }, 200);
+  }
 }
 
 async function refreshTabTree() {
@@ -2719,7 +2802,7 @@ function renderHistory(items, query = '', recentSessions = []) {
 
       el.addEventListener('click', (e) => {
         if (e.target.closest('.history-remove')) return;
-        chrome.tabs.create({ url: item.url });
+        chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
         // 最近使用したブックマーク更新
         updateRecentlyUsed(item.url);
 
@@ -2963,7 +3046,7 @@ function createBookmarkItem(item, query = '') {
       return;
     }
 
-    chrome.tabs.create({ url: item.url });
+    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
     updateRecentlyUsed(item.url);
 
     if (state.userSettings.closeOnSelect) {
@@ -3297,6 +3380,11 @@ chrome.runtime.onMessage.addListener((message) => {
 
     case 'GOOGLE_TASKS_UPDATED':
       refreshGoogleTasks();
+      break;
+
+    case 'SETTINGS_UPDATED':
+      state.userSettings = { ...state.userSettings, ...message.settings };
+      renderSettingsPanel();
       break;
   }
 });

@@ -573,6 +573,12 @@
     "actionDisplayMode": {
         "message": "Switch Display Mode"
     },
+    "actionEnableExtension": {
+        "message": "Enable Extension"
+    },
+    "actionChangeShortcut": {
+        "message": "Change"
+    },
     "actionSortMode": {
         "message": "Switch Sort Mode"
     },
@@ -671,6 +677,9 @@
     },
     "ctxAddToGoogleTodo": {
         "message": "Add to Google Todo"
+    },
+    "shortcutToggleInteraction": {
+        "message": "Toggle Display Mode (Popup/Side Panel)"
     },
     "toastAddedToGoogleTodo": {
         "message": "Added to Google Todo"

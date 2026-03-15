@@ -442,6 +442,8 @@ body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-pin
   min-height: calc(var(--tab-height) - 8px);
   border-radius: var(--radius-sm);
   padding: 0 4px;
+  padding-right: 4px;
+  /* Ensure close button has space */
   margin-left: 2px;
   transition: background var(--transition), transform var(--transition);
 }
@@ -659,15 +661,21 @@ body[data-toggle-size="large"] .tab-toggle svg {
 
 /* タブアクション（ホバー時表示） */
 .tab-actions {
-  display: none;
+  display: flex;
+  /* Always flex but children might be hidden */
   align-items: center;
   gap: 2px;
-  margin-left: 4px;
+  margin-left: auto;
+  /* Push to right */
   margin-right: 4px;
+  opacity: 0;
+  transition: opacity var(--transition);
+  pointer-events: none;
 }
 
 .tab-item:hover .tab-actions {
-  display: flex;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .tab-action-btn {
@@ -695,33 +703,8 @@ body[data-toggle-size="large"] .tab-toggle svg {
   background: var(--bg-active);
 }
 
-/* 左側固定のバツボタン */
-.left-action {
-  opacity: 0;
-  width: 20px;
-  margin-right: 2px;
-  transition: all var(--transition);
-  overflow: hidden;
-  flex-shrink: 0;
-  pointer-events: none;
-}
-
-body.disable-selection-animation .left-action {
-  transition: none;
-}
-
-.tab-item:hover .left-action {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .tab-action-btn.close-btn:hover {
   color: var(--accent-red);
-}
-
-.tab-action-btn.left-action svg {
-  width: 14px;
-  height: 14px;
 }
 
 /* 子孫件数バッジ（展開時・折りたたみ時共通） */
@@ -2316,6 +2299,27 @@ body.mode-mini .pinned-count-label {
   color: var(--bg-primary);
   border-color: var(--theme-color);
   animation: shortcut-pulse 1.5s infinite;
+}
+
+.shortcut-kbd-btn.global-shortcut-btn {
+  cursor: default;
+  background: var(--bg-secondary);
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.shortcut-kbd-btn.global-shortcut-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+.toolbar-btn[icon-only] {
+  padding: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @keyframes shortcut-pulse {

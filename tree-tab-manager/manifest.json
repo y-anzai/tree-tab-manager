@@ -24,6 +24,13 @@
         "mac": "Command+Shift+S"
       },
       "description": "__MSG_shortcutToggle__"
+    },
+    "toggle-interaction-mode": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+X",
+        "mac": "Command+Shift+X"
+      },
+      "description": "__MSG_shortcutToggleInteraction__"
     }
   },
   "__content_scripts": [
