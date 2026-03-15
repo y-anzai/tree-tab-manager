@@ -339,6 +339,9 @@
       }
     }
   },
+  "ctxAddToGoogleTodo": {
+    "message": "Google Todo に追加"
+  },
   "ctxPinTab": {
     "message": "タブを固定"
   },
@@ -659,5 +662,11 @@
   },
   "sizeLarge": {
     "message": "大"
+  },
+  "toastAddedToGoogleTodo": {
+    "message": "Google Todo に追加しました"
+  },
+  "toastGoogleTodoAddFailed": {
+    "message": "Google Todo への追加に失敗しました。OAuth設定を確認してください。"
   }
 }

@@ -18,6 +18,8 @@ const state = {
   tabGroupInfo: {},       // groupId -> { id, title, color, collapsed }
   tabGroupCollapseState: {}, // groupId -> collapsed (ローカルサイドバー状態)
 
+  googleTasks: {},        // url -> listName
+
   // 履歴パネル
   historyItems: [],
   historyQuery: '',
@@ -1447,6 +1449,17 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
       <div class="tab-info">
         <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
         ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
+        ${(() => {
+      const taskInfo = state.googleTasks[tab.url];
+      if (!taskInfo) return '';
+      // 互換性維持：文字列（旧形式）の場合はリスト名として扱う
+      const listName = typeof taskInfo === 'string' ? taskInfo : taskInfo.listName;
+      const status = typeof taskInfo === 'string' ? 'needsAction' : taskInfo.status;
+      const isCompleted = status === 'completed';
+      return `<div class="tab-todo-tag ${isCompleted ? 'completed' : ''}" title="${escapeHtml(listName)} (Click to toggle status)">
+                    <span>${isCompleted ? '✓' : '○'}</span>${escapeHtml(listName)}
+                  </div>`;
+    })()}
       </div>
       ${(state.tabSortMode === 'recent' && !tab.pinned) ? `<span class="tab-relative-time">${getRelativeTimeString(state.tabActivationTime[tab.id])}</span>` : ''}
       <div class="tab-actions">
@@ -1561,10 +1574,33 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
   }
 
   // 右クリックコンテキストメニュー
-  item.addEventListener('contextmenu', (e) => {
+  item.addEventListener('contextmenu', async (e) => {
     e.preventDefault();
-    showTabContextMenu(e.clientX, e.clientY, tab);
+    await showTabContextMenu(e.clientX, e.clientY, tab);
   });
+
+  // トグルクリックイベント
+  const todoTag = item.querySelector('.tab-todo-tag');
+  if (todoTag && state.googleTasks[tab.url]) {
+    todoTag.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const taskInfo = state.googleTasks[tab.url];
+      try {
+        const res = await sendMessage('TOGGLE_GOOGLE_TASK_STATUS', {
+          listId: taskInfo.listId,
+          taskId: taskInfo.taskId,
+          status: taskInfo.status
+        });
+        if (res.success) {
+          await refreshGoogleTasks();
+        } else {
+          showToast('Failed to toggle status', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  }
 
   // ドラッグ&ドロップ
   setupDragAndDrop(item, tab);
@@ -1572,7 +1608,28 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
   return item;
 }
 
-function showTabContextMenu(x, y, tab) {
+async function addTabToGoogleTodo(tab, listId = null) {
+  showToast(chrome.i18n.getMessage('msgLoading'), 'info');
+  try {
+    const res = await sendMessage('ADD_TO_GOOGLE_TODO', {
+      tabId: tab.id,
+      url: tab.url,
+      title: getTabDisplayName(tab),
+      listId: listId
+    });
+    if (res.success) {
+      showToast(chrome.i18n.getMessage('toastAddedToGoogleTodo'), 'success');
+      await refreshGoogleTasks();
+    } else {
+      const errorMsg = res.error || chrome.i18n.getMessage('toastGoogleTodoAddFailed');
+      showToast(errorMsg, 'error');
+    }
+  } catch (e) {
+    showToast(chrome.i18n.getMessage('toastGoogleTodoAddFailed'), 'error');
+  }
+}
+
+async function showTabContextMenu(x, y, tab) {
   // 親タブ（子タブがある）かどうか（state.tabParents から正確に判定）
   const hasChildren = state.tabs.some(t => state.tabParents[t.id] === tab.id);
   // 最近開いた順モードではツリー操作を非表示にする
@@ -1611,6 +1668,25 @@ function showTabContextMenu(x, y, tab) {
       action: () => createChildTab(tab.id)
     }
   ];
+
+  // Google Todo 追加メニュー
+  if (!state.googleTasks[tab.url]) {
+    try {
+      const res = await sendMessage('GET_TASK_LISTS');
+      if (res.success && res.lists && res.lists.length > 0) {
+        menuItems.push({ separator: true });
+        res.lists.forEach(list => {
+          menuItems.push({
+            label: `To: ${list.title}`,
+            icon: ICON.readingList,
+            action: () => addTabToGoogleTodo(tab, list.id)
+          });
+        });
+      }
+    } catch (e) {
+      console.error('[TTM] Failed to fetch task lists for context menu');
+    }
+  }
 
   // ─── グループ操作（固定タブ・全モード共通）───
   if (!tab.pinned) {
@@ -3119,6 +3195,10 @@ chrome.runtime.onMessage.addListener((message) => {
         el.classList.toggle('active-tab', Number(el.dataset.tabId) === message.tabId);
       });
       break;
+
+    case 'GOOGLE_TASKS_UPDATED':
+      refreshGoogleTasks();
+      break;
   }
 });
 
@@ -3136,7 +3216,16 @@ async function init() {
   applyCloseOnSelectUI();
   applyTabFontSize();
   applyTabSelectionAnimationUI();
+  await refreshGoogleTasks();
   await loadTabs();
+}
+
+async function refreshGoogleTasks() {
+  try {
+    const res = await sendMessage('GET_GOOGLE_TASKS');
+    state.googleTasks = res.tasks || {};
+    renderTabs();
+  } catch (e) { }
 }
 
 init().catch(console.error);

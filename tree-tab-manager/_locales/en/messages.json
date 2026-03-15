@@ -659,5 +659,14 @@
     },
     "sizeLarge": {
         "message": "Large"
+    },
+    "ctxAddToGoogleTodo": {
+        "message": "Add to Google Todo"
+    },
+    "toastAddedToGoogleTodo": {
+        "message": "Added to Google Todo"
+    },
+    "toastGoogleTodoAddFailed": {
+        "message": "Failed to add to Google Todo. Check OAuth settings and reload extension."
     }
 }

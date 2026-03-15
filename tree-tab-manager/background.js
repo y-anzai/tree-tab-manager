@@ -9,12 +9,19 @@ const tabMetadata = new Map();
 const STORAGE_KEY_PARENTS = 'ttm-tab-parents';
 const STORAGE_KEY_METADATA = 'ttm-tab-metadata';
 
+// Google Tasks キャッシュ (url -> listName)
+let googleTasksCache = new Map();
+
 // 起動時にデータをロード
 async function loadTreeData() {
-  const data = await chrome.storage.local.get([STORAGE_KEY_PARENTS, STORAGE_KEY_METADATA, 'ttm-last-tab-state']);
+  const data = await chrome.storage.local.get([STORAGE_KEY_PARENTS, STORAGE_KEY_METADATA, 'ttm-last-tab-state', 'ttm-google-tasks-cache']);
   const savedParents = data[STORAGE_KEY_PARENTS] || {};
   const savedMetadata = data[STORAGE_KEY_METADATA] || {};
   const lastState = data['ttm-last-tab-state'] || [];
+
+  if (data['ttm-google-tasks-cache']) {
+    googleTasksCache = new Map(Object.entries(data['ttm-google-tasks-cache']));
+  }
 
   const currentTabs = await chrome.tabs.query({});
   const tabIds = new Set(currentTabs.map(t => t.id));
@@ -106,6 +113,57 @@ async function saveTreeData() {
 }
 
 // 初期化実行
+loadTreeData();
+
+// Google Tasks 同期
+async function fetchGoogleTasks() {
+  try {
+    const token = await new Promise((resolve) => {
+      chrome.identity.getAuthToken({ interactive: false }, (t) => {
+        if (chrome.runtime.lastError) resolve(null);
+        else resolve(t);
+      });
+    });
+    if (!token) return;
+
+    const listsRes = await fetch('https://www.googleapis.com/tasks/v1/users/@me/lists', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const lists = await listsRes.json();
+    if (!lists.items) return;
+
+    const newCache = new Map();
+    for (const list of lists.items) {
+      const tasksRes = await fetch(`https://www.googleapis.com/tasks/v1/lists/${list.id}/tasks`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const tasks = await tasksRes.json();
+      if (tasks.items) {
+        tasks.items.forEach(task => {
+          const urlMatch = (task.notes || task.title || '').match(/https?:\/\/[^\s]+/);
+          if (urlMatch) {
+            newCache.set(urlMatch[0], {
+              listName: list.title,
+              listId: list.id,
+              taskId: task.id,
+              status: task.status // 'needsAction' or 'completed'
+            });
+          }
+        });
+      }
+    }
+    googleTasksCache = newCache;
+    await chrome.storage.local.set({ 'ttm-google-tasks-cache': Object.fromEntries(newCache) });
+    notifyPanels({ type: 'GOOGLE_TASKS_UPDATED' });
+  } catch (e) {
+    console.error('[TTM] Google Tasks fetch failed:', e);
+  }
+}
+
+// 定期同期と初期同期
+setInterval(fetchGoogleTasks, 3600000);
+setTimeout(fetchGoogleTasks, 5000);
+
 loadTreeData();
 
 // 拡張機能のインストール/起動時にサイドパネルを設定
@@ -299,6 +357,140 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           notifyPanels({ type: 'TREE_UPDATED' });
           sendResponse({ tab });
         });
+      return true;
+
+    case 'GET_GOOGLE_TASKS':
+      sendResponse({ tasks: Object.fromEntries(googleTasksCache) });
+      break;
+
+    case 'GET_TASK_LISTS':
+      (async () => {
+        try {
+          const token = await new Promise((resolve, reject) => {
+            chrome.identity.getAuthToken({ interactive: false }, (t) => {
+              if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+              else resolve(t);
+            });
+          });
+          const res = await fetch('https://www.googleapis.com/tasks/v1/users/@me/lists', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          sendResponse({ success: true, lists: data.items || [] });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      return true;
+
+    case 'TOGGLE_GOOGLE_TASK_STATUS':
+      (async () => {
+        try {
+          const token = await new Promise((resolve, reject) => {
+            chrome.identity.getAuthToken({ interactive: false }, (t) => {
+              if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+              else resolve(t);
+            });
+          });
+          const { listId, taskId, status } = message;
+          const newStatus = status === 'completed' ? 'needsAction' : 'completed';
+
+          const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              status: newStatus,
+              completed: newStatus === 'completed' ? new Date().toISOString() : null
+            })
+          });
+
+          if (!res.ok) throw new Error('Failed to update task status');
+          const updatedTask = await res.json();
+
+          // キャッシュ更新
+          for (const [url, info] of googleTasksCache.entries()) {
+            if (info.taskId === taskId) {
+              info.status = updatedTask.status;
+              break;
+            }
+          }
+          await chrome.storage.local.set({ 'ttm-google-tasks-cache': Object.fromEntries(googleTasksCache) });
+          notifyPanels({ type: 'GOOGLE_TASKS_UPDATED' });
+
+          sendResponse({ success: true, status: updatedTask.status });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      return true;
+
+    case 'ADD_TO_GOOGLE_TODO':
+      (async () => {
+        try {
+          const token = await new Promise((resolve, reject) => {
+            console.log('[TTM] Requesting auth token...');
+            chrome.identity.getAuthToken({ interactive: true }, (t) => {
+              if (chrome.runtime.lastError) {
+                console.error('[TTM] Auth token error:', chrome.runtime.lastError);
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                console.log('[TTM] Auth token received');
+                resolve(t);
+              }
+            });
+          });
+
+          const listsRes = await fetch('https://www.googleapis.com/tasks/v1/users/@me/lists', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const lists = await listsRes.json();
+
+          let targetListId = message.listId;
+          let targetListTitle = '';
+
+          if (!targetListId) {
+            const defaultList = lists.items?.[0];
+            if (!defaultList) throw new Error('No list found');
+            targetListId = defaultList.id;
+            targetListTitle = defaultList.title;
+          } else {
+            const list = lists.items.find(l => l.id === targetListId);
+            targetListTitle = list ? list.title : 'Task';
+          }
+
+          const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/${targetListId}/tasks`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              title: message.title,
+              notes: message.url
+            })
+          });
+
+          if (!res.ok) throw new Error('Failed to create task');
+          const newTask = await res.json();
+
+          googleTasksCache.set(message.url, {
+            listName: targetListTitle,
+            listId: targetListId,
+            taskId: newTask.id,
+            status: newTask.status
+          });
+          await chrome.storage.local.set({ 'ttm-google-tasks-cache': Object.fromEntries(googleTasksCache) });
+          notifyPanels({ type: 'GOOGLE_TASKS_UPDATED' });
+
+          sendResponse({ success: true, listName: targetListTitle });
+        } catch (e) {
+          console.error('[TTM] Google Todo add failed:', e);
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
       return true;
 
     case 'GET_HISTORY':

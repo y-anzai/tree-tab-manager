@@ -598,7 +598,49 @@ body[data-toggle-size="large"] .tab-toggle svg {
   font-size: var(--tab-url-font-size, 10px);
   color: var(--text-muted);
   margin-left: 8px;
+  white-space: nowrap;
   flex-shrink: 0;
+}
+
+.tab-todo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  color: var(--theme-color);
+  background: var(--bg-secondary);
+  padding: 0px 5px;
+  border-radius: 4px;
+  width: fit-content;
+  border: 1px solid var(--theme-color);
+  opacity: 0.9;
+  margin-top: 1px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab-todo-tag:hover {
+  opacity: 1;
+  background: var(--bg-tertiary);
+}
+
+.tab-todo-tag.completed {
+  background: var(--bg-active);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.tab-todo-tag span {
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.tab-todo-tag.completed span {
+  color: var(--theme-color);
+  text-decoration: none;
+  display: inline-block;
 }
 
 /* ピンアイコン */
