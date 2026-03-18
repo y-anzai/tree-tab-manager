@@ -15,7 +15,8 @@
     "scripting",
     "readingList",
     "favicon",
-    "identity"
+    "identity",
+    "contextMenus"
   ],
   "commands": {
     "_execute_action": {
@@ -33,16 +34,18 @@
       "description": "__MSG_shortcutToggleInteraction__"
     }
   },
-  "__content_scripts": [
+  "content_scripts": [
     {
       "matches": [
         "<all_urls>"
       ],
       "js": [
-        "content/mini-tree.js"
+        "content/mini-tree.js",
+        "content/snippets.js"
       ],
       "css": [
-        "content/mini-tree.css"
+        "content/mini-tree.css",
+        "content/snippets.css"
       ],
       "run_at": "document_start"
     }

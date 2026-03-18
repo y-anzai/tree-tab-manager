@@ -41,6 +41,14 @@ const state = {
   customTabNames: {},    // tabId -> customName
   tabCustomNamesByUrl: {}, // url -> customName（再訪時のため）
 
+  // スニペットパネル
+  snippets: [],
+  snippetFolders: [],
+  snippetFolderCollapseState: {},
+  snippetQuery: '',
+  currentEditSnippetId: null,
+  currentEditFolderId: null,
+
   // ユーザー設定
   userSettings: {
     historyRecentlyClosed: false,
@@ -92,6 +100,7 @@ const DEFAULT_TAB_CONFIG = [
   { id: 'tabs', label: chrome.i18n.getMessage('navTabs'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/></svg>' },
   { id: 'history', label: chrome.i18n.getMessage('navHistory'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>' },
   { id: 'bookmarks', label: chrome.i18n.getMessage('navBookmarks'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>' },
+  { id: 'snippets', label: chrome.i18n.getMessage('navSnippets'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>' },
   { id: 'readingList', label: chrome.i18n.getMessage('navReadingList'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>' },
   { id: 'settings', label: chrome.i18n.getMessage('navSettings'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>' }
 ];
@@ -573,6 +582,7 @@ function renderNavTabs() {
 
       if (tab.id === 'history') loadHistory();
       if (tab.id === 'bookmarks') loadBookmarks();
+      if (tab.id === 'snippets') loadSnippets();
       if (tab.id === 'readingList') loadReadingList();
     });
     nav.appendChild(btn);
@@ -594,6 +604,7 @@ function renderNavTabs() {
     // 初期ロード時の読み込み
     if (targetId === 'history') loadHistory();
     if (targetId === 'bookmarks') loadBookmarks();
+    if (targetId === 'snippets') loadSnippets();
     if (targetId === 'readingList') loadReadingList();
   });
 }
@@ -3386,6 +3397,10 @@ chrome.runtime.onMessage.addListener((message) => {
       state.userSettings = { ...state.userSettings, ...message.settings };
       renderSettingsPanel();
       break;
+
+    case 'SNIPPETS_UPDATED':
+      loadSnippets();
+      break;
   }
 });
 
@@ -3418,19 +3433,7 @@ async function refreshGoogleTasks() {
 init().catch(console.error);
 
 
-// ===== i18n Localization =====
-function localizeHtmlPage() {
-  document.documentElement.lang = chrome.i18n.getUILanguage().split('-')[0];
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.innerHTML = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
-  });
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    el.title = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
-  });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    el.placeholder = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
-  });
-}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', localizeHtmlPage);
 } else {
@@ -3510,3 +3513,304 @@ window.addEventListener('focus', updateFocusState);
 window.addEventListener('blur', updateFocusState);
 // 初期実行
 updateFocusState();
+// ===== スニペット管理 =====
+async function loadSnippets() {
+  try {
+    const [snipRes, foldRes] = await Promise.all([
+      sendMessage('GET_SNIPPETS'),
+      sendMessage('GET_SNIPPET_FOLDERS')
+    ]);
+    state.snippets = snipRes.snippets || [];
+    state.snippetFolders = foldRes.folders || [];
+    renderSnippets();
+  } catch (e) {
+    const container = document.getElementById('snippet-list');
+    if (container) container.innerHTML = `<div class="empty-state">${chrome.i18n.getMessage('emptySnippets')}</div>`;
+  }
+}
+
+function renderSnippets() {
+  const container = document.getElementById('snippet-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const q = state.snippetQuery.toLowerCase();
+
+  // フォルダをレンダリング
+  state.snippetFolders.forEach(folder => {
+    const folderSnippets = state.snippets.filter(s => s.folderId === folder.id);
+    const matchesFolder = folder.name.toLowerCase().includes(q);
+    const matchedSnippets = folderSnippets.filter(s => 
+      s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q)
+    );
+
+    if (q && !matchesFolder && matchedSnippets.length === 0) return;
+
+    const folderEl = document.createElement('div');
+    const isCollapsed = state.snippetFolderCollapseState[folder.id];
+    folderEl.className = `snippet-folder ${isCollapsed ? 'collapsed' : ''}`;
+    folderEl.dataset.folderId = folder.id;
+
+    folderEl.innerHTML = `
+      <div class="snippet-folder-header">
+        <svg class="snippet-folder-toggle" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+        </svg>
+        <svg class="snippet-folder-icon" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+        </svg>
+        <span class="snippet-folder-title">${escapeHtml(folder.name)}</span>
+        <div class="snippet-folder-actions">
+          <button class="list-item-btn btn-edit-folder" title="${chrome.i18n.getMessage('ctxEdit')}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </button>
+          <button class="list-item-btn btn-delete-folder" title="${chrome.i18n.getMessage('ctxDelete')}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="snippet-folder-content"></div>
+    `;
+
+    const header = folderEl.querySelector('.snippet-folder-header');
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.snippet-folder-actions')) return;
+      state.snippetFolderCollapseState[folder.id] = !state.snippetFolderCollapseState[folder.id];
+      folderEl.classList.toggle('collapsed');
+    });
+
+    header.querySelector('.btn-edit-folder').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditFolderModal(folder);
+    });
+
+    header.querySelector('.btn-delete-folder').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm(chrome.i18n.getMessage('confirmDeleteFolder', [folder.name]))) {
+        await sendMessage('DELETE_SNIPPET_FOLDER', { id: folder.id });
+      }
+    });
+
+    // ドラッグ＆ドロップ (フォルダへの移動)
+    header.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      header.classList.add('drag-over');
+    });
+    header.addEventListener('dragleave', () => header.classList.remove('drag-over'));
+    header.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      header.classList.remove('drag-over');
+      const snippetId = e.dataTransfer.getData('text/plain');
+      if (snippetId) {
+        await sendMessage('MOVE_SNIPPET_TO_FOLDER', { snippetId, folderId: folder.id });
+      }
+    });
+
+    const content = folderEl.querySelector('.snippet-folder-content');
+    const displaySnippets = q ? matchedSnippets : folderSnippets;
+    displaySnippets.forEach(s => content.appendChild(createSnippetItem(s)));
+
+    container.appendChild(folderEl);
+  });
+
+  // ルートのスニペット
+  const rootSnippets = state.snippets.filter(s => !s.folderId);
+  rootSnippets.forEach(s => {
+    if (q && !s.name.toLowerCase().includes(q) && !(s.description || '').toLowerCase().includes(q)) return;
+    container.appendChild(createSnippetItem(s));
+  });
+
+  // ドラッグ＆ドロップ (ルートへの移動)
+  container.addEventListener('dragover', (e) => {
+    if (e.target === container) {
+      e.preventDefault();
+    }
+  });
+  container.addEventListener('drop', async (e) => {
+    if (e.target === container) {
+      e.preventDefault();
+      const snippetId = e.dataTransfer.getData('text/plain');
+      if (snippetId) {
+        await sendMessage('MOVE_SNIPPET_TO_FOLDER', { snippetId, folderId: null });
+      }
+    }
+  });
+
+  if (container.children.length === 0) {
+    container.innerHTML = `<div class="empty-state">${chrome.i18n.getMessage('emptySnippets')}</div>`;
+  }
+}
+
+function createSnippetItem(s) {
+  const item = document.createElement('div');
+  item.className = 'list-item snippet-item';
+  item.draggable = true;
+  item.dataset.id = s.id;
+  
+  const clickCount = s.clickCount || 0;
+  item.innerHTML = `
+    <div class="list-item-icon">
+      <img src="${getFaviconUrl(s.url)}" onerror="this.src='../icons/icon16.png'">
+    </div>
+    <div class="list-item-content">
+      <div class="list-item-title">${escapeHtml(s.name)}</div>
+      <div class="list-item-url">${escapeHtml(s.description || s.text.substring(0, 100))}</div>
+      <div class="snippet-meta">
+        <span class="click-count">${chrome.i18n.getMessage('clickCountLabel', [clickCount])}</span>
+        <span class="snippet-date">${new Date(s.timestamp).toLocaleDateString()}</span>
+      </div>
+    </div>
+    <div class="list-item-actions">
+      <button class="list-item-btn btn-copy-snippet" title="テキストをコピー">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      </button>
+      <button class="list-item-btn btn-edit-snippet" title="${chrome.i18n.getMessage('ctxEdit')}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      </button>
+      <button class="list-item-btn btn-delete-snippet" title="${chrome.i18n.getMessage('ctxDelete')}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+      </button>
+    </div>
+  `;
+
+  item.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', s.id);
+    item.classList.add('dragging');
+  });
+  item.addEventListener('dragend', () => item.classList.remove('dragging'));
+
+  item.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    item.classList.add('drag-over');
+  });
+  item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+  item.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    item.classList.remove('drag-over');
+    const draggedId = e.dataTransfer.getData('text/plain');
+    if (draggedId && draggedId !== s.id) {
+      // 物理的な並び替え
+      const snippets = [...state.snippets];
+      const fromIdx = snippets.findIndex(x => x.id === draggedId);
+      const toIdx = snippets.findIndex(x => x.id === s.id);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const item = snippets.splice(fromIdx, 1)[0];
+        // 同じ階層（同じフォルダ内または両方ルート）であれば単純移動
+        item.folderId = s.folderId;
+        snippets.splice(toIdx, 0, item);
+        await sendMessage('REORDER_SNIPPETS', { snippets });
+      }
+    }
+  });
+
+  item.addEventListener('click', (e) => {
+    if (e.target.closest('.list-item-actions')) return;
+    sendMessage('INCREMENT_SNIPPET_CLICK', { id: s.id });
+    sendMessage('NAVIGATE_TO_SNIPPET', { url: s.url, scrollY: s.scrollY, text: s.text });
+  });
+
+  item.querySelector('.btn-copy-snippet').addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(s.text).then(() => {
+      showToast("Copied to clipboard!");
+    });
+  });
+
+  item.querySelector('.btn-edit-snippet').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openEditSnippetModal(s);
+  });
+
+  item.querySelector('.btn-delete-snippet').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (confirm(chrome.i18n.getMessage('confirmDeleteBookmark', [s.name]))) {
+      await sendMessage('DELETE_SNIPPET', { id: s.id });
+    }
+  });
+
+  return item;
+}
+
+function openEditSnippetModal(snippet) {
+  state.currentEditSnippetId = snippet.id;
+  document.getElementById('edit-snippet-name').value = snippet.name;
+  document.getElementById('edit-snippet-desc').value = snippet.description || '';
+  document.getElementById('modal-snippet-edit').classList.remove('hidden');
+}
+
+document.getElementById('btn-save-edit-snippet')?.addEventListener('click', async () => {
+  if (!state.currentEditSnippetId) return;
+  const name = document.getElementById('edit-snippet-name').value.trim();
+  const description = document.getElementById('edit-snippet-desc').value.trim();
+  
+  await sendMessage('UPDATE_SNIPPET', {
+    snippet: {
+      id: state.currentEditSnippetId,
+      name: name,
+      description: description
+    }
+  });
+  
+  document.getElementById('modal-snippet-edit').classList.add('hidden');
+  state.currentEditSnippetId = null;
+});
+
+// フォルダ作成・編集
+function openEditFolderModal(folder = null) {
+  state.currentEditFolderId = folder ? folder.id : null;
+  document.getElementById('folder-modal-title').textContent = folder ? chrome.i18n.getMessage('snippetEditTitle') : chrome.i18n.getMessage('navSnippetsAddFolder');
+  document.getElementById('edit-folder-name').value = folder ? folder.name : '';
+  document.getElementById('modal-folder-edit').classList.remove('hidden');
+}
+
+document.getElementById('btn-add-snippet-folder')?.addEventListener('click', () => {
+  openEditFolderModal();
+});
+
+document.getElementById('btn-save-folder')?.addEventListener('click', async () => {
+  const name = document.getElementById('edit-folder-name').value.trim();
+  if (!name) return;
+
+  if (state.currentEditFolderId) {
+    await sendMessage('UPDATE_SNIPPET_FOLDER', {
+      id: state.currentEditFolderId,
+      folder: { name }
+    });
+  } else {
+    await sendMessage('CREATE_SNIPPET_FOLDER', {
+      folder: {
+        id: 'fold_' + Date.now(),
+        name: name
+      }
+    });
+  }
+
+  document.getElementById('modal-folder-edit').classList.add('hidden');
+  state.currentEditFolderId = null;
+});
+
+const snippetSearch = document.getElementById('snippet-search');
+if (snippetSearch) {
+  snippetSearch.oninput = (e) => {
+    state.snippetQuery = e.target.value;
+    renderSnippets();
+  };
+}
+
+// ===== i18n Localization =====
+function localizeHtmlPage() {
+  document.documentElement.lang = chrome.i18n.getUILanguage().split('-')[0];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    // スニペット等の要素も個別に処理される
+    const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+    if (msg) el.innerHTML = msg;
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
+    if (msg) el.title = msg;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
+    if (msg) el.placeholder = msg;
+  });
+}

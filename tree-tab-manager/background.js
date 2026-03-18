@@ -179,6 +179,34 @@ chrome.runtime.onInstalled.addListener(async () => {
     chrome.action.setPopup({ popup: '' });
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
   }
+
+  // 右クリックコンテキストメニュー (スニペット追加)
+  chrome.contextMenus.create({
+    id: 'add-to-snippets',
+    title: chrome.i18n.getMessage('ctxAddSnippet'),
+    contexts: ['selection']
+  });
+});
+
+// コンテキストメニュークリック
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'add-to-snippets') {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_SNIPPET' });
+    } catch (e) {
+      // スクリプトが注入されていない場合は手動で注入して再試行
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content/snippets.js']
+        });
+        // 注入完了後に再度メッセージ送る
+        chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_SNIPPET' });
+      } catch (err) {
+        console.error("[TTM] Failed to inject snippets script:", err);
+      }
+    }
+  }
 });
 
 // アクションボタンクリックでサイドパネルを開く（ポップアップ設定時は動かない）
@@ -549,6 +577,184 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'DELETE_SESSION':
       deleteSession(message.sessionId).then(() => sendResponse({ success: true }));
+      return true;
+
+    case 'SAVE_SNIPPET':
+      (async () => {
+        try {
+          console.log("[TTM] Saving snippet:", message.snippet);
+          const result = await chrome.storage.local.get('ttm-snippets');
+          let snippets = result['ttm-snippets'];
+          if (!Array.isArray(snippets)) snippets = [];
+          snippets.unshift(message.snippet);
+          await chrome.storage.local.set({ 'ttm-snippets': snippets });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+          sendResponse({ success: true });
+        } catch (e) {
+          console.error("[TTM] Failed to save snippet:", e);
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      return true;
+
+    case 'GET_SNIPPETS':
+      chrome.storage.local.get('ttm-snippets').then(res => {
+        sendResponse({ snippets: res['ttm-snippets'] || [] });
+      });
+      return true;
+
+    case 'GET_SNIPPET_FOLDERS':
+      chrome.storage.local.get('ttm-snippet-folders').then(res => {
+        sendResponse({ folders: res['ttm-snippet-folders'] || [] });
+      });
+      return true;
+
+    case 'DELETE_SNIPPET':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippets');
+        const snippets = (result['ttm-snippets'] || []).filter(s => s.id !== message.id);
+        await chrome.storage.local.set({ 'ttm-snippets': snippets });
+        notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'UPDATE_SNIPPET':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippets');
+        let snippets = result['ttm-snippets'] || [];
+        const idx = snippets.findIndex(s => s.id === message.snippet.id);
+        if (idx !== -1) {
+          snippets[idx] = { ...snippets[idx], ...message.snippet };
+          await chrome.storage.local.set({ 'ttm-snippets': snippets });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'CREATE_SNIPPET_FOLDER':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippet-folders');
+        const folders = result['ttm-snippet-folders'] || [];
+        folders.push(message.folder);
+        await chrome.storage.local.set({ 'ttm-snippet-folders': folders });
+        notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'UPDATE_SNIPPET_FOLDER':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippet-folders');
+        let folders = result['ttm-snippet-folders'] || [];
+        const idx = folders.findIndex(f => f.id === message.id);
+        if (idx !== -1) {
+          folders[idx] = { ...folders[idx], ...message.folder };
+          await chrome.storage.local.set({ 'ttm-snippet-folders': folders });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'DELETE_SNIPPET_FOLDER':
+      (async () => {
+        const foldersResult = await chrome.storage.local.get('ttm-snippet-folders');
+        const folders = (foldersResult['ttm-snippet-folders'] || []).filter(f => f.id !== message.id);
+        await chrome.storage.local.set({ 'ttm-snippet-folders': folders });
+
+        // フォルダー内のスニペットをルートに移動
+        const snippetsResult = await chrome.storage.local.get('ttm-snippets');
+        const snippets = (snippetsResult['ttm-snippets'] || []).map(s => {
+          if (s.folderId === message.id) delete s.folderId;
+          return s;
+        });
+        await chrome.storage.local.set({ 'ttm-snippets': snippets });
+
+        notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'REORDER_SNIPPETS':
+      (async () => {
+        await chrome.storage.local.set({ 'ttm-snippets': message.snippets });
+        notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'MOVE_SNIPPET_TO_FOLDER':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippets');
+        let snippets = result['ttm-snippets'] || [];
+        const idx = snippets.findIndex(s => s.id === message.snippetId);
+        if (idx !== -1) {
+          if (message.folderId) {
+            snippets[idx].folderId = message.folderId;
+          } else {
+            delete snippets[idx].folderId;
+          }
+          await chrome.storage.local.set({ 'ttm-snippets': snippets });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'INCREMENT_SNIPPET_CLICK':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippets');
+        let snippets = result['ttm-snippets'] || [];
+        const idx = snippets.findIndex(s => s.id === message.id);
+        if (idx !== -1) {
+          snippets[idx].clickCount = (snippets[idx].clickCount || 0) + 1;
+          await chrome.storage.local.set({ 'ttm-snippets': snippets });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'NAVIGATE_TO_SNIPPET':
+      (async () => {
+        const { url, scrollY, text } = message;
+        const tabs = await chrome.tabs.query({});
+        let targetTab = tabs.find(t => t.url === url);
+
+        async function doScroll(tabId) {
+          try {
+            await chrome.tabs.sendMessage(tabId, { type: 'SCROLL_TO_POSITION', scrollY, text });
+          } catch (err) {
+            // Content script not loaded yet or missing
+            await chrome.scripting.executeScript({
+              target: { tabId },
+              files: ['content/snippets.js']
+            });
+            setTimeout(() => {
+              chrome.tabs.sendMessage(tabId, { type: 'SCROLL_TO_POSITION', scrollY, text }).catch(() => {});
+            }, 300);
+          }
+        }
+
+        if (targetTab) {
+          await chrome.tabs.update(targetTab.id, { active: true });
+          await chrome.windows.update(targetTab.windowId, { focused: true });
+          doScroll(targetTab.id);
+        } else {
+          targetTab = await chrome.tabs.create({ url });
+          const listener = (tabId, changeInfo) => {
+            if (tabId === targetTab.id && changeInfo.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(listener);
+              // Give extra time for React/SPA rendering
+              setTimeout(() => doScroll(tabId), 500);
+            }
+          };
+          chrome.tabs.onUpdated.addListener(listener);
+        }
+        sendResponse({ success: true });
+      })();
       return true;
 
     /* cases for MINI_TREE deactivated */

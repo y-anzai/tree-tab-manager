@@ -51,6 +51,24 @@
       </svg>
       Bookmarks
     </button>
+    <button class="tab-btn" data-panel="snippets" data-i18n="navSnippets">
+      <svg viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H7z" clip-rule="evenodd" />
+      </svg>
+      Scraps
+    </button>
+    <button class="tab-btn" data-panel="readingList" data-i18n="navReadingList">
+      <svg viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+      </svg>
+      List
+    </button>
+    <button class="tab-btn" data-panel="settings" data-i18n="navSettings">
+      <svg viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+      </svg>
+      Settings
+    </button>
   </nav>
 
   <!-- タブパネル -->
@@ -176,6 +194,28 @@
         data-i18n-placeholder="bookmarkSearchPlaceholder" class="search-input">
     </div>
     <div class="list-container" id="bookmark-list">
+      <div class="loading" data-i18n="msgLoading">読み込み中...</div>
+    </div>
+  </div>
+
+  <!-- スニペットパネル -->
+  <div id="panel-snippets" class="panel">
+    <div class="search-bar">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd"
+          d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+          clip-rule="evenodd" />
+      </svg>
+      <input type="text" id="snippet-search" placeholder="スニペットを検索..."
+        data-i18n-placeholder="snippetSearchPlaceholder" class="search-input">
+      <button class="toolbar-btn" id="btn-add-snippet-folder" title="フォルダ作成" data-i18n-title="navSnippetsAddFolder">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+          <path fill="white" d="M10 9a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1H8a1 1 0 110-2h1v-1a1 1 0 011-1z" />
+        </svg>
+      </button>
+    </div>
+    <div class="list-container" id="snippet-list">
       <div class="loading" data-i18n="msgLoading">読み込み中...</div>
     </div>
   </div>
@@ -353,6 +393,49 @@
             <div class="loading" data-i18n="msgLoading">読み込み中...</div>
           </div>
         </div>
+      </div>
+    </div>
+
+  <!-- スニペット編集モーダル -->
+  <div id="modal-snippet-edit" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 data-i18n="snippetEditTitle">スニペットの編集</h3>
+        <button class="modal-close" data-modal="modal-snippet-edit">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <label class="modal-label" data-i18n="ctxEditName" style="font-size:12px; color:var(--text-muted); margin-bottom:4px; display:block;">名称</label>
+          <input type="text" id="edit-snippet-name" class="modal-input">
+        </div>
+        <div class="modal-section" style="margin-top:12px;">
+          <label class="modal-label" data-i18n="snippetDescPlaceholder" style="font-size:12px; color:var(--text-muted); margin-bottom:4px; display:block;">説明</label>
+          <textarea id="edit-snippet-desc" class="modal-input" style="height: 100px; resize: none;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-snippet-edit" data-i18n="btnCancel">キャンセル</button>
+        <button class="btn-primary" id="btn-save-edit-snippet" data-i18n="btnSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- スニペットフォルダ編集モーダル -->
+  <div id="modal-folder-edit" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="folder-modal-title">フォルダの作成</h3>
+        <button class="modal-close" data-modal="modal-folder-edit">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <label class="modal-label" data-i18n="ctxEditName">名称</label>
+          <input type="text" id="edit-folder-name" class="modal-input" data-i18n-placeholder="folderNamePlaceholder">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-folder-edit" data-i18n="btnCancel">キャンセル</button>
+        <button class="btn-primary" id="btn-save-folder" data-i18n="btnSave">保存</button>
       </div>
     </div>
   </div>

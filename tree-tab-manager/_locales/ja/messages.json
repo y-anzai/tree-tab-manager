@@ -686,5 +686,58 @@
   },
   "toastGoogleTodoAddFailed": {
     "message": "Google Todo への追加に失敗しました。OAuth設定を確認してください。"
+  },
+  "navSnippets": {
+    "message": "スニペット"
+  },
+  "ctxAddSnippet": {
+    "message": "スニペットに追加"
+  },
+  "snippetNamePlaceholder": {
+    "message": "名称を入力..."
+  },
+  "snippetDescPlaceholder": {
+    "message": "説明を入力 (任意)..."
+  },
+  "toastSnippetAdded": {
+    "message": "スニペットを保存しました"
+  },
+  "emptySnippets": {
+    "message": "保存されたスニペットがありません"
+  },
+  "snippetTextPlaceholder": {
+    "message": "選択された文言"
+  },
+  "btnSaveSnippet": {
+    "message": "保存"
+  },
+  "btnCancelSnippet": {
+    "message": "キャンセル"
+  },
+  "ctxEditSnippet": {
+    "message": "スニペットを編集"
+  },
+  "snippetEditTitle": {
+    "message": "スニペットの編集"
+  },
+  "clickCountLabel": {
+    "message": "$1 回クリック",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "navSnippetsAddFolder": {
+    "message": "フォルダ作成"
+  },
+  "folderNamePlaceholder": {
+    "message": "フォルダ名を入力..."
+  },
+  "confirmDeleteFolder": {
+    "message": "フォルダ「$1」を削除しますか？ 中身のスニペットは削除されません。"
+  },
+  "snippetSearchPlaceholder": {
+    "message": "スニペット（スクラップ）を検索..."
   }
 }

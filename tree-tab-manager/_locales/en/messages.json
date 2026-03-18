@@ -686,5 +686,58 @@
     },
     "toastGoogleTodoAddFailed": {
         "message": "Failed to add to Google Todo. Check OAuth settings and reload extension."
+    },
+    "navSnippets": {
+        "message": "Scraps"
+    },
+    "ctxAddSnippet": {
+        "message": "Add to Scraps"
+    },
+    "snippetNamePlaceholder": {
+        "message": "Enter name..."
+    },
+    "snippetDescPlaceholder": {
+        "message": "Enter description (optional)..."
+    },
+    "toastSnippetAdded": {
+        "message": "Scrap saved"
+    },
+    "emptySnippets": {
+        "message": "No scraps found"
+    },
+    "snippetTextPlaceholder": {
+        "message": "Selected text"
+    },
+    "btnSaveSnippet": {
+        "message": "Save"
+    },
+    "btnCancelSnippet": {
+        "message": "Cancel"
+    },
+    "ctxEditSnippet": {
+        "message": "Edit Scrap"
+    },
+    "snippetEditTitle": {
+        "message": "Edit Scrap"
+    },
+    "clickCountLabel": {
+        "message": "$1 clicks",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "navSnippetsAddFolder": {
+        "message": "Create Folder"
+    },
+    "folderNamePlaceholder": {
+        "message": "Enter folder name..."
+    },
+    "confirmDeleteFolder": {
+        "message": "Delete folder \"$1\"? Snippets inside will not be deleted."
+    },
+    "snippetSearchPlaceholder": {
+        "message": "Search scraps..."
     }
 }
