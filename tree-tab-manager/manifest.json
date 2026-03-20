@@ -40,11 +40,9 @@
         "<all_urls>"
       ],
       "js": [
-        "content/mini-tree.js",
         "content/snippets.js"
       ],
       "css": [
-        "content/mini-tree.css",
         "content/snippets.css"
       ],
       "run_at": "document_start"

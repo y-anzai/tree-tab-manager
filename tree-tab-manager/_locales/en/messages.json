@@ -618,12 +618,6 @@
     "actionSwitchSettings": {
         "message": "Switch to Settings"
     },
-    "actionToggleMiniTree": {
-        "message": "Toggle Mini Tree (90px)"
-    },
-    "toolbarToggleMiniTree": {
-        "message": "Show/Hide Mini Tree"
-    },
     "settingsSidePanelSide": {
         "message": "Side Panel Position (Left/Right)"
     },
@@ -632,9 +626,6 @@
     },
     "sideRight": {
         "message": "Right"
-    },
-    "settingsMiniTreeWidth": {
-        "message": "Mini Tree Width"
     },
     "toolbarCloseOnSelect": {
         "message": "Close panel after selecting a tab (ON/OFF)"

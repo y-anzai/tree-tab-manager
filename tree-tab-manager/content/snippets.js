@@ -11,37 +11,125 @@
     } else if (message.type === 'SCROLL_TO_POSITION') {
       const { scrollY, text } = message;
       let attempts = 0;
-      const maxAttempts = 10;
+      const maxAttempts = 15; // 拡張: Geminiなど遅いSPA用に
       
       const tryScroll = () => {
-        const currentMaxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const foundRect = quickFindTextRect(text);
         
-        if (currentMaxScroll < scrollY && attempts < maxAttempts) {
-          attempts++;
-          window.scrollTo(0, document.documentElement.scrollHeight);
-          setTimeout(tryScroll, 500);
+        if (foundRect) {
+          // If text is found on the current DOM, scroll to it directly.
+          window.scrollTo({
+            top: window.scrollY + foundRect.top - 150, // Leave more padding for floating headers
+            behavior: 'smooth'
+          });
+          
+          // try to scroll parent divs if any are scrollable
+          const sel = window.getSelection();
+          if (sel.rangeCount > 0) {
+            let node = sel.getRangeAt(0).commonAncestorContainer;
+            if (node.nodeType === 3) node = node.parentNode;
+            if (node && node.scrollIntoView) {
+              node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+
+          setTimeout(() => highlightRange(text), 300);
           return;
         }
 
-        window.scrollTo({
-          top: scrollY,
-          behavior: 'smooth'
-        });
+        attempts++;
+        if (attempts < maxAttempts) {
+          const targetY = scrollY !== undefined ? scrollY : document.documentElement.scrollHeight;
+          const jumpY = Math.min(document.documentElement.scrollHeight, targetY + (attempts * 1000));
+          
+          window.scrollTo(0, jumpY);
+          
+          // Also try to scroll any scrollable elements in the page (common in SPAs like Genspark)
+          document.querySelectorAll('div').forEach(el => {
+            if (el.scrollHeight > el.clientHeight && el.clientHeight > 0) {
+              const style = window.getComputedStyle(el);
+              if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+                el.scrollTop = jumpY;
+              }
+            }
+          });
+          
+          setTimeout(tryScroll, 600);
+          return;
+        }
 
-        // 位置の調整とハイライトをより高速に実行
-        const highlightAction = () => {
-          window.scrollTo({ top: scrollY, behavior: 'instant' });
-          highlightRange(text);
-        };
-
-        // スクロール量が少ない場合は即座に、多い場合も待ち時間を短縮
-        const scrollDiff = Math.abs(window.scrollY - scrollY);
-        setTimeout(highlightAction, scrollDiff < 100 ? 50 : 300);
+        // 最終的なフォールバック（位置だけ合わす）
+        if (scrollY !== undefined) {
+          window.scrollTo({
+            top: scrollY,
+            behavior: 'smooth'
+          });
+          document.querySelectorAll('div').forEach(el => {
+            if (el.scrollHeight > el.clientHeight && el.clientHeight > 0) {
+              const style = window.getComputedStyle(el);
+              if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+                el.scrollTop = scrollY;
+              }
+            }
+          });
+        }
+        setTimeout(() => highlightRange(text), 300);
       };
 
       tryScroll();
     }
   });
+
+  // A helper function to find the rect of the text if it currently exists on the page
+  function quickFindTextRect(text) {
+    if (!text) return null;
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    if (window.find(text, false, false, true, false, true, false)) {
+      if (sel.rangeCount > 0) {
+        const rect = sel.getRangeAt(0).getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return rect;
+        }
+      }
+    }
+    
+    // Fallback: search text nodes manually (useful for some SPAs or shadow DOMs sometimes)
+    sel.removeAllRanges(); // reset
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    
+    // Create a simplified text for matching if exact match fails
+    const searchTerms = text.split(/\s+/).filter(w => w.length > 2);
+    
+    while (node = walker.nextNode()) {
+      const val = node.nodeValue;
+      if (val.includes(text) || (searchTerms.length > 0 && searchTerms.every(term => val.includes(term)))) {
+        const range = document.createRange();
+        // Try to find the start index of the first match logic
+        let idx = val.indexOf(text);
+        if (idx === -1) {
+          idx = val.indexOf(searchTerms[0]);
+        }
+        
+        if (idx !== -1) {
+          try {
+            range.setStart(node, idx);
+            // Don't overflow the node length
+            range.setEnd(node, Math.min(val.length, idx + text.length));
+            const rect = range.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              sel.addRange(range);
+              return rect;
+            }
+          } catch(e) {
+            // Ignore Range errors
+          }
+        }
+      }
+    }
+    return null;
+  }
 
   function highlightRange(text) {
     if (!text) return;
@@ -49,23 +137,34 @@
     // 既存のハイライトをクリア
     document.querySelectorAll('.ttm-nav-highlight').forEach(el => el.remove());
 
-    // 前方検索を試みる
-    const found = window.find(text, false, false, true, false, true, false);
-    if (!found) return;
-
     const selection = window.getSelection();
+    let hasSelection = selection.rangeCount > 0 && 
+      (selection.toString().includes(text.substring(0, Math.min(10, text.length))) || text.includes(selection.toString().substring(0, Math.min(10, selection.toString().length))));
+    
+    // If not already selected by quickFindTextRect, try finding it again
+    if (!hasSelection) {
+      if (!quickFindTextRect(text)) return;
+    }
+
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const rects = range.getClientRects();
-      const scrollY = window.scrollY;
+      const currentScrollY = window.scrollY;
       const scrollX = window.scrollX;
+
+      // Ensure the element is scrolled into view (especially for inner scrollable containers)
+      let commonNode = range.commonAncestorContainer;
+      if (commonNode.nodeType === 3) commonNode = commonNode.parentNode;
+      if (commonNode && commonNode.scrollIntoView) {
+        commonNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
 
       const highlights = [];
       for (const rect of rects) {
         const overlay = document.createElement('div');
         overlay.className = 'ttm-nav-highlight';
         overlay.style.position = 'absolute';
-        overlay.style.top = (rect.top + scrollY - 2) + 'px';
+        overlay.style.top = (rect.top + currentScrollY - 2) + 'px';
         overlay.style.left = (rect.left + scrollX - 2) + 'px';
         overlay.style.width = (rect.width + 4) + 'px';
         overlay.style.height = (rect.height + 4) + 'px';
@@ -111,9 +210,26 @@
 
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
-    const scrollY = window.scrollY + rect.top - 100; // 少し上に余白を持たせる
 
-    showDialog(selectedText, Math.max(0, scrollY));
+    // Find the best scrollY: prefer the closest scrollable container's scroll position
+    let scrollContainer = range.commonAncestorContainer;
+    if (scrollContainer.nodeType === 3) scrollContainer = scrollContainer.parentNode;
+    
+    let containerScrollTop = 0;
+    let el = scrollContainer;
+    while (el && el !== document.body) {
+      const style = window.getComputedStyle(el);
+      if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+        containerScrollTop = el.scrollTop;
+        break;
+      }
+      el = el.parentElement;
+    }
+
+    // Use the larger of window.scrollY and the container's scrollTop as effective scroll position
+    const effectiveScrollY = Math.max(window.scrollY, containerScrollTop) + rect.top - 100;
+
+    showDialog(selectedText, Math.max(0, effectiveScrollY));
   }
 
   function showDialog(text, scrollY) {
@@ -221,38 +337,72 @@
 
     const dialog = document.createElement('div');
     dialog.className = 'dialog';
-    dialog.innerHTML = `
-      <div class="header">${chrome.i18n.getMessage('ctxAddSnippet')}</div>
-      
-      <div class="field">
-        <div class="label">${chrome.i18n.getMessage('ctxEditName')}</div>
-        <input type="text" id="name" placeholder="${chrome.i18n.getMessage('snippetNamePlaceholder')}" value="${text.substring(0, 30)}${text.length > 30 ? '...' : ''}">
-      </div>
 
-      <div class="field">
-        <div class="label">${chrome.i18n.getMessage('snippetTextPlaceholder')}</div>
-        <textarea readonly>${text}</textarea>
-      </div>
+    const header = document.createElement('div');
+    header.className = 'header';
+    header.textContent = chrome.i18n.getMessage('ctxAddSnippet');
+    dialog.appendChild(header);
 
-      <div class="field">
-        <div class="label">${chrome.i18n.getMessage('snippetDescPlaceholder')}</div>
-        <input type="text" id="desc" placeholder="${chrome.i18n.getMessage('snippetDescPlaceholder')}">
-      </div>
+    const titleField = document.createElement('div');
+    titleField.className = 'field';
+    const titleLabel = document.createElement('div');
+    titleLabel.className = 'label';
+    titleLabel.textContent = chrome.i18n.getMessage('ctxEditName');
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.id = 'name';
+    titleInput.placeholder = chrome.i18n.getMessage('snippetNamePlaceholder');
+    titleInput.value = text.substring(0, 30) + (text.length > 30 ? '...' : '');
+    titleField.appendChild(titleLabel);
+    titleField.appendChild(titleInput);
+    dialog.appendChild(titleField);
 
-      <div class="footer">
-        <button class="btn-secondary" id="cancel">${chrome.i18n.getMessage('btnCancelSnippet')}</button>
-        <button class="btn-primary" id="save">${chrome.i18n.getMessage('btnSaveSnippet')}</button>
-      </div>
-    `;
+    const textField = document.createElement('div');
+    textField.className = 'field';
+    const textLabel = document.createElement('div');
+    textLabel.className = 'label';
+    textLabel.textContent = chrome.i18n.getMessage('snippetTextPlaceholder');
+    const textArea = document.createElement('textarea');
+    textArea.readOnly = true;
+    textArea.value = text;
+    textField.appendChild(textLabel);
+    textField.appendChild(textArea);
+    dialog.appendChild(textField);
+
+    const descField = document.createElement('div');
+    descField.className = 'field';
+    const descLabel = document.createElement('div');
+    descLabel.className = 'label';
+    descLabel.textContent = chrome.i18n.getMessage('snippetDescPlaceholder');
+    const descInput = document.createElement('input');
+    descInput.type = 'text';
+    descInput.id = 'desc';
+    descInput.placeholder = chrome.i18n.getMessage('snippetDescPlaceholder');
+    descInput.value = document.title;
+    descField.appendChild(descLabel);
+    descField.appendChild(descInput);
+    dialog.appendChild(descField);
+
+    const footer = document.createElement('div');
+    footer.className = 'footer';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn-secondary';
+    cancelBtn.id = 'cancel';
+    cancelBtn.textContent = chrome.i18n.getMessage('btnCancelSnippet') || 'Cancel';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn-primary';
+    saveBtn.id = 'save';
+    saveBtn.textContent = chrome.i18n.getMessage('btnSaveSnippet') || 'Save';
+    footer.appendChild(cancelBtn);
+    footer.appendChild(saveBtn);
+    dialog.appendChild(footer);
 
     shadow.appendChild(style);
     shadow.appendChild(dialog);
     document.body.appendChild(host);
 
-    const nameInput = shadow.getElementById('name');
-    const descInput = shadow.getElementById('desc');
-    nameInput.focus();
-    nameInput.select();
+    titleInput.focus();
+    titleInput.select();
 
     const close = () => {
       document.body.removeChild(host);
@@ -260,7 +410,7 @@
 
     shadow.getElementById('cancel').onclick = close;
     shadow.getElementById('save').onclick = () => {
-      const name = nameInput.value.trim() || text.substring(0, 50);
+      const name = titleInput.value.trim() || text.substring(0, 50);
       const description = descInput.value.trim();
       
       chrome.runtime.sendMessage({

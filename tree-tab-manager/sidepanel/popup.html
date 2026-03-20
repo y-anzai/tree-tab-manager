@@ -104,14 +104,6 @@
         </svg>
       </button>
       <div class="toolbar-right">
-        <button class="toolbar-btn" id="btn-toggle-mini-tree" title="ミニツリーを表示/非表示"
-          data-i18n-title="toolbarToggleMiniTree" style="display: none;">
-          <svg viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-              d="M3 4a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm1 1v10h3V5H4zm4 10h7V5H8v10z"
-              clip-rule="evenodd" />
-          </svg>
-        </button>
         <button class="toolbar-btn" id="btn-sessions" title="セッション管理" data-i18n-title="toolbarSessions">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path
@@ -308,16 +300,6 @@
             <option value="right" data-i18n="sideRight">右</option>
             <option value="left" data-i18n="sideLeft">左</option>
           </select>
-        </label>
-
-        <label class="settings-item-normal" style="display: none;">
-          <div class="settings-item-label" data-i18n="settingsMiniTreeWidth">ミニツリーの幅</div>
-          <div class="settings-item-value"
-            style="display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end;">
-            <input type="range" id="setting-mini-tree-width" min="40" max="300" step="10"
-              style="flex: 1; max-width: 120px;">
-            <span id="mini-tree-width-value" style="font-size: 12px; color: var(--text); min-width: 35px;">90px</span>
-          </div>
         </label>
 
         <label class="settings-item-normal">

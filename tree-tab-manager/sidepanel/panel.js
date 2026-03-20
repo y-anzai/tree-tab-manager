@@ -56,7 +56,6 @@ const state = {
     themeColor: 'blue',
     colorScheme: 'auto',
     sidePanelSide: 'right',
-    miniTreeWidth: 90,
     focusIntensity: 'medium', // 'none', 'low', 'medium', 'high'
     closeOnSelect: false,
     tabSelectionAnimation: true,
@@ -128,7 +127,7 @@ async function applyDisplayMode(mode) {
   state.displayMode = mode;
   try { await chrome.storage.local.set({ 'ttm-displayMode': mode }); } catch { }
 
-  const btn = document.getElementById('btn-toggle-mini-tree') ? document.getElementById('btn-display-mode') : document.getElementById('btn-display-mode');
+  const btn = document.getElementById('btn-display-mode');
   if (!btn) return;
   btn.innerHTML = MODE_ICONS[mode];
 
@@ -268,15 +267,6 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
   if (sel) sel.value = next;
 });
 
-/* btn-toggle-mini-tree deactivated
-document.getElementById('btn-toggle-mini-tree').addEventListener('click', () => {
-  chrome.storage.local.get('ttm-mini-tree-visible', (res) => {
-    const next = !res['ttm-mini-tree-visible'];
-    chrome.storage.local.set({ 'ttm-mini-tree-visible': next });
-  });
-});
-*/
-
 // ===== タブ並び順モード管理 =====
 // 'tree'（ツリー表示）| 'recent'（最近開いた順フラット表示）
 
@@ -372,13 +362,6 @@ function handleShortcutAction(actionId) {
       break;
     case 'expand-all':
       document.getElementById('btn-expand-all')?.click();
-      break;
-    case 'toggle-mini-tree':
-      // アクティブタブのcontent scriptへトグルを送信
-      chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-        if (!tab || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) return;
-        chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
-      });
       break;
   }
 }
@@ -484,8 +467,7 @@ async function loadUserSettings() {
   // 他のコンポーネント用への同期
   chrome.storage.local.set({
     'ttm-shortcuts': state.userSettings.shortcuts || {},
-    'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
-    'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
+    'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right'
   });
 }
 
@@ -503,7 +485,6 @@ async function saveUserSettings() {
       'ttm-user-settings': state.userSettings,
       'ttm-shortcuts': state.userSettings.shortcuts || {},
       'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
-      'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90,
       'ttm-show-pinned-tabs': state.showPinnedTabs
     });
 
@@ -584,6 +565,11 @@ function renderNavTabs() {
       if (tab.id === 'bookmarks') loadBookmarks();
       if (tab.id === 'snippets') loadSnippets();
       if (tab.id === 'readingList') loadReadingList();
+      // タブパネルに切り替えたとき、ダーティなら再同期
+      if (tab.id === 'tabs' && tabsDirty) {
+        tabsDirty = false;
+        loadTabs();
+      }
     });
     nav.appendChild(btn);
   });
@@ -796,21 +782,6 @@ function renderSettingsPanel() {
     selSide.onchange = (e) => {
       state.userSettings.sidePanelSide = e.target.value;
       saveUserSettings();
-    };
-  }
-
-  // ミニツリーの幅設定
-  const sliderWidth = document.getElementById('setting-mini-tree-width');
-  const spanWidth = document.getElementById('mini-tree-width-value');
-  if (sliderWidth && spanWidth) {
-    const val = state.userSettings.miniTreeWidth || 90;
-    sliderWidth.value = val;
-    spanWidth.textContent = `${val}px`;
-    sliderWidth.oninput = (e) => {
-      const v = parseInt(e.target.value);
-      spanWidth.textContent = `${v}px`;
-      state.userSettings.miniTreeWidth = v;
-      saveUserSettingsDebounced();
     };
   }
 
@@ -1570,7 +1541,9 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
       ${!faviconUrl ? getDefaultFavicon() : `<span class="tab-favicon-default" style="display:none">${getDefaultFavicon()}</span>`}
       ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>' : ''}
       <div class="tab-info">
-        <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
+        <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">
+          ${tab.audible ? `<svg class="tab-audio-icon" viewBox="0 0 20 20" fill="currentColor" title="再生中"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clip-rule="evenodd"/></svg>` : ''}${escapeHtml(getTabDisplayName(tab))}
+        </div>
         ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
         ${(() => {
       const taskInfo = state.googleTasks[tab.url];
@@ -3369,6 +3342,8 @@ if (chrome.readingList) {
 }
 
 // ===== バックグラウンドからのメッセージ受信 =====
+let tabsDirty = false; // タブパネルが非表示のときに更新があったフラグ
+
 chrome.runtime.onMessage.addListener((message) => {
   switch (message.type) {
     case 'TAB_CREATED':
@@ -3376,9 +3351,12 @@ chrome.runtime.onMessage.addListener((message) => {
     case 'TAB_UPDATED':
     case 'TAB_MOVED':
     case 'TREE_UPDATED':
-      // タブパネルが表示中なら更新
+    case 'TAB_ATTACHED':
+      // タブパネルが表示中なら即時更新、非表示ならダーティフラグを立てる
       if (document.getElementById('panel-tabs').classList.contains('active')) {
         loadTabs();
+      } else {
+        tabsDirty = true; // パネルが開かれたときに同期させる
       }
       break;
 
@@ -3454,6 +3432,69 @@ function stopRecentTimeUpdateTimer() {
     recentTimeUpdateInterval = null;
   }
 }
+
+// ===== タブリスト同期ウォッチドッグ =====
+// バックグラウンドのサービスワーカーが停止中にイベントを逃した場合でも
+// 実際のタブリストとパネル表示を定期的に照合・同期する
+
+let tabSyncInterval = null;
+let lastKnownTabSyncTime = 0;
+
+async function checkAndSyncTabList() {
+  // タブパネルが非表示なら何もしない
+  const tabPanel = document.getElementById('panel-tabs');
+  if (!tabPanel || !tabPanel.classList.contains('active')) return;
+
+  try {
+    const realTabs = await chrome.tabs.query({ currentWindow: true });
+    const realIds = new Set(realTabs.map(t => t.id));
+    const stateIds = new Set(state.tabs.map(t => t.id));
+
+    let needSync = false;
+
+    // 実際に存在しないタブが state にある → 吹っ飛び検出
+    if (state.tabs.some(t => !realIds.has(t.id))) needSync = true;
+    // 実際には存在するタブが state にない → 追加検出
+    if (realTabs.some(t => !stateIds.has(t.id))) needSync = true;
+    // 件数が違う
+    if (realTabs.length !== state.tabs.length) needSync = true;
+
+    if (needSync) {
+      console.log('[TTM] Tab sync: drift detected, reloading tabs...');
+      await loadTabs();
+    }
+  } catch (e) {
+    // 無視（拡張機能コンテキスト無効など）
+  }
+
+  lastKnownTabSyncTime = Date.now();
+}
+
+function startTabSyncWatchdog() {
+  if (tabSyncInterval) return;
+  // 30秒ごとに照合
+  tabSyncInterval = setInterval(checkAndSyncTabList, 30000);
+}
+
+function stopTabSyncWatchdog() {
+  if (tabSyncInterval) {
+    clearInterval(tabSyncInterval);
+    tabSyncInterval = null;
+  }
+}
+
+// ウォッチドッグを開始
+startTabSyncWatchdog();
+
+// タブパネルが再度フォーカスされたとき（ウィンドウ復帰時）に即時照合
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    // 最終同期から5秒以上経っていたら即時チェック
+    if (Date.now() - lastKnownTabSyncTime > 5000) {
+      checkAndSyncTabList();
+    }
+  }
+});
 
 function applyToggleSize() {
   const size = state.userSettings.toggleSize || 'medium';

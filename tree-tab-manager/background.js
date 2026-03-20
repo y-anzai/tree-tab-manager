@@ -216,12 +216,7 @@ chrome.action.onClicked.addListener((tab) => {
 
 // コマンドリスナー（ショートカットキー）
 chrome.commands.onCommand.addListener(async (command) => {
-  if (command === 'toggle-mini-tree') {
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!activeTab) return;
-    if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
-    chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
-  } else if (command === 'toggle-interaction-mode') {
+  if (command === 'toggle-interaction-mode') {
     const data = await chrome.storage.local.get('ttm-user-settings');
     const settings = data['ttm-user-settings'] || {};
     const currentMode = settings.interactionMode || 'sidepanel';
@@ -283,7 +278,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
 
 // タブ更新時に通知
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl || 'groupId' in changeInfo) {
+  if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl || 'groupId' in changeInfo || 'audible' in changeInfo || 'mutedInfo' in changeInfo) {
     // グループが変更された場合、すべての子孫も同じグループに入れる（ユーザーリクエスト）
     if ('groupId' in changeInfo) {
       const descendants = getDescendantIds(tabId);
@@ -727,28 +722,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           try {
             await chrome.tabs.sendMessage(tabId, { type: 'SCROLL_TO_POSITION', scrollY, text });
           } catch (err) {
-            // Content script not loaded yet or missing
-            await chrome.scripting.executeScript({
-              target: { tabId },
-              files: ['content/snippets.js']
-            });
+            // Content script not loaded yet or missing, inject it then retry
+            try {
+              await chrome.scripting.executeScript({
+                target: { tabId },
+                files: ['content/snippets.js']
+              });
+            } catch (injErr) {
+              // Ignore injection errors (e.g., chrome:// pages)
+            }
             setTimeout(() => {
               chrome.tabs.sendMessage(tabId, { type: 'SCROLL_TO_POSITION', scrollY, text }).catch(() => {});
-            }, 300);
+            }, 500);
           }
         }
 
         if (targetTab) {
           await chrome.tabs.update(targetTab.id, { active: true });
           await chrome.windows.update(targetTab.windowId, { focused: true });
-          doScroll(targetTab.id);
+          // SPA may need a moment to reactive its virtual DOM after tab re-focus
+          setTimeout(() => doScroll(targetTab.id), 300);
         } else {
           targetTab = await chrome.tabs.create({ url });
           const listener = (tabId, changeInfo) => {
             if (tabId === targetTab.id && changeInfo.status === 'complete') {
               chrome.tabs.onUpdated.removeListener(listener);
-              // Give extra time for React/SPA rendering
-              setTimeout(() => doScroll(tabId), 500);
+              // Give extra time for React/SPA rendering (e.g. Gemini, Genspark)
+              setTimeout(() => doScroll(tabId), 1000);
             }
           };
           chrome.tabs.onUpdated.addListener(listener);

@@ -621,12 +621,6 @@
   "actionSwitchSettings": {
     "message": "「設定」パネルへ"
   },
-  "actionToggleMiniTree": {
-    "message": "ミニツリー表示切替 (90px)"
-  },
-  "toolbarToggleMiniTree": {
-    "message": "ミニツリーを表示/非表示"
-  },
   "toolbarCloseOnSelect": {
     "message": "選択後にパネルを自動で閉じる (ON/OFF)"
   },
@@ -638,9 +632,6 @@
   },
   "sideRight": {
     "message": "右"
-  },
-  "settingsMiniTreeWidth": {
-    "message": "ミニツリーの幅"
   },
   "settingsFocusIntensity": {
     "message": "フォーカス効果の強度"
