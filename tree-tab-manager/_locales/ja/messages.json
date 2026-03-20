@@ -699,6 +699,9 @@
   "snippetTextPlaceholder": {
     "message": "選択された文言"
   },
+  "snippetUrlPlaceholder": {
+    "message": "URL"
+  },
   "btnSaveSnippet": {
     "message": "保存"
   },

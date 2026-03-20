@@ -3705,6 +3705,9 @@ function createSnippetItem(s) {
       <button class="list-item-btn btn-copy-snippet" title="テキストをコピー">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
       </button>
+      <button class="list-item-btn btn-copy-snippet-url" title="${chrome.i18n.getMessage('ctxCopyUrl')}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+      </button>
       <button class="list-item-btn btn-edit-snippet" title="${chrome.i18n.getMessage('ctxEdit')}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
       </button>
@@ -3757,6 +3760,13 @@ function createSnippetItem(s) {
     });
   });
 
+  item.querySelector('.btn-copy-snippet-url').addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(s.url).then(() => {
+      showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success');
+    });
+  });
+
   item.querySelector('.btn-edit-snippet').addEventListener('click', (e) => {
     e.stopPropagation();
     openEditSnippetModal(s);
@@ -3775,6 +3785,8 @@ function createSnippetItem(s) {
 function openEditSnippetModal(snippet) {
   state.currentEditSnippetId = snippet.id;
   document.getElementById('edit-snippet-name').value = snippet.name;
+  document.getElementById('edit-snippet-url').value = snippet.url || '';
+  document.getElementById('edit-snippet-text').value = snippet.text || '';
   document.getElementById('edit-snippet-desc').value = snippet.description || '';
   document.getElementById('modal-snippet-edit').classList.remove('hidden');
 }
@@ -3782,12 +3794,16 @@ function openEditSnippetModal(snippet) {
 document.getElementById('btn-save-edit-snippet')?.addEventListener('click', async () => {
   if (!state.currentEditSnippetId) return;
   const name = document.getElementById('edit-snippet-name').value.trim();
+  const url = document.getElementById('edit-snippet-url').value.trim();
+  const text = document.getElementById('edit-snippet-text').value.trim();
   const description = document.getElementById('edit-snippet-desc').value.trim();
   
   await sendMessage('UPDATE_SNIPPET', {
     snippet: {
       id: state.currentEditSnippetId,
       name: name,
+      url: url,
+      text: text,
       description: description
     }
   });

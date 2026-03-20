@@ -363,7 +363,7 @@
     textLabel.className = 'label';
     textLabel.textContent = chrome.i18n.getMessage('snippetTextPlaceholder');
     const textArea = document.createElement('textarea');
-    textArea.readOnly = true;
+    textArea.id = 'text';
     textArea.value = text;
     textField.appendChild(textLabel);
     textField.appendChild(textArea);
@@ -410,15 +410,16 @@
 
     shadow.getElementById('cancel').onclick = close;
     shadow.getElementById('save').onclick = () => {
-      const name = titleInput.value.trim() || text.substring(0, 50);
+      const name = titleInput.value.trim() || textArea.value.substring(0, 50);
       const description = descInput.value.trim();
+      const currentText = textArea.value;
       
       chrome.runtime.sendMessage({
         type: 'SAVE_SNIPPET',
         snippet: {
           id: 'snip_' + Date.now(),
           name: name,
-          text: text,
+          text: currentText,
           description: description,
           url: window.location.href,
           title: document.title,
