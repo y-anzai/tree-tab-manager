@@ -489,6 +489,15 @@
     "settingsOtherTitle": {
         "message": "Other Settings"
     },
+    "settingsInteractionMode": {
+        "message": "Panel Display Mode"
+    },
+    "interactionSidepanel": {
+        "message": "Side Panel"
+    },
+    "interactionPopup": {
+        "message": "Popup"
+    },
     "settingsTabDisplayMode": {
         "message": "Tab Display Mode"
     },
@@ -564,6 +573,12 @@
     "actionDisplayMode": {
         "message": "Switch Display Mode"
     },
+    "actionEnableExtension": {
+        "message": "Enable Extension"
+    },
+    "actionChangeShortcut": {
+        "message": "Change"
+    },
     "actionSortMode": {
         "message": "Switch Sort Mode"
     },
@@ -603,12 +618,6 @@
     "actionSwitchSettings": {
         "message": "Switch to Settings"
     },
-    "actionToggleMiniTree": {
-        "message": "Toggle Mini Tree (90px)"
-    },
-    "toolbarToggleMiniTree": {
-        "message": "Show/Hide Mini Tree"
-    },
     "settingsSidePanelSide": {
         "message": "Side Panel Position (Left/Right)"
     },
@@ -617,9 +626,6 @@
     },
     "sideRight": {
         "message": "Right"
-    },
-    "settingsMiniTreeWidth": {
-        "message": "Mini Tree Width"
     },
     "toolbarCloseOnSelect": {
         "message": "Close panel after selecting a tab (ON/OFF)"
@@ -663,10 +669,66 @@
     "ctxAddToGoogleTodo": {
         "message": "Add to Google Todo"
     },
+    "shortcutToggleInteraction": {
+        "message": "Toggle Display Mode (Popup/Side Panel)"
+    },
     "toastAddedToGoogleTodo": {
         "message": "Added to Google Todo"
     },
     "toastGoogleTodoAddFailed": {
         "message": "Failed to add to Google Todo. Check OAuth settings and reload extension."
+    },
+    "navSnippets": {
+        "message": "Scraps"
+    },
+    "ctxAddSnippet": {
+        "message": "Add to Scraps"
+    },
+    "snippetNamePlaceholder": {
+        "message": "Enter name..."
+    },
+    "snippetDescPlaceholder": {
+        "message": "Enter description (optional)..."
+    },
+    "toastSnippetAdded": {
+        "message": "Scrap saved"
+    },
+    "emptySnippets": {
+        "message": "No scraps found"
+    },
+    "snippetTextPlaceholder": {
+        "message": "Selected text"
+    },
+    "btnSaveSnippet": {
+        "message": "Save"
+    },
+    "btnCancelSnippet": {
+        "message": "Cancel"
+    },
+    "ctxEditSnippet": {
+        "message": "Edit Scrap"
+    },
+    "snippetEditTitle": {
+        "message": "Edit Scrap"
+    },
+    "clickCountLabel": {
+        "message": "$1 clicks",
+        "placeholders": {
+            "1": {
+                "content": "$1"
+            }
+        }
+    },
+    "navSnippetsAddFolder": {
+        "message": "Create Folder"
+    },
+    "folderNamePlaceholder": {
+        "message": "Enter folder name..."
+    },
+    "confirmDeleteFolder": {
+        "message": "Delete folder \"$1\"? Snippets inside will not be deleted."
+    },
+    "snippetSearchPlaceholder": {
+        "message": "Search scraps..."
     }
 }

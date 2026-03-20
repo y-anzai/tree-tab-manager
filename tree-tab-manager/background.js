@@ -167,24 +167,77 @@ setTimeout(fetchGoogleTasks, 5000);
 loadTreeData();
 
 // 拡張機能のインストール/起動時にサイドパネルを設定
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+chrome.runtime.onInstalled.addListener(async () => {
+  const data = await chrome.storage.local.get('ttm-user-settings');
+  const settings = data['ttm-user-settings'] || {};
+  const mode = settings.interactionMode || 'sidepanel';
+
+  if (mode === 'popup') {
+    chrome.action.setPopup({ popup: 'sidepanel/popup.html' });
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => { });
+  } else {
+    chrome.action.setPopup({ popup: '' });
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
+  }
+
+  // 右クリックコンテキストメニュー (スニペット追加)
+  chrome.contextMenus.create({
+    id: 'add-to-snippets',
+    title: chrome.i18n.getMessage('ctxAddSnippet'),
+    contexts: ['selection']
+  });
 });
 
-// アクションボタンクリックでサイドパネルを開く
+// コンテキストメニュークリック
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'add-to-snippets') {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_SNIPPET' });
+    } catch (e) {
+      // スクリプトが注入されていない場合は手動で注入して再試行
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content/snippets.js']
+        });
+        // 注入完了後に再度メッセージ送る
+        chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_SNIPPET' });
+      } catch (err) {
+        console.error("[TTM] Failed to inject snippets script:", err);
+      }
+    }
+  }
+});
+
+// アクションボタンクリックでサイドパネルを開く（ポップアップ設定時は動かない）
 chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ windowId: tab.windowId });
+  chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => { });
 });
 
 // コマンドリスナー（ショートカットキー）
-// chrome.commands.onCommand.addListener(async (command) => {
-//   if (command === 'toggle-mini-tree') {
-//     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-//     if (!activeTab) return;
-//     if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('about:') || activeTab.url.startsWith('chrome-extension://')) return;
-//     chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
-//   }
-// });
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'toggle-interaction-mode') {
+    const data = await chrome.storage.local.get('ttm-user-settings');
+    const settings = data['ttm-user-settings'] || {};
+    const currentMode = settings.interactionMode || 'sidepanel';
+    const newMode = currentMode === 'sidepanel' ? 'popup' : 'sidepanel';
+
+    settings.interactionMode = newMode;
+    await chrome.storage.local.set({ 'ttm-user-settings': settings });
+
+    // アクションの振る舞いを更新
+    if (newMode === 'popup') {
+      chrome.action.setPopup({ popup: 'sidepanel/popup.html' });
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => { });
+    } else {
+      chrome.action.setPopup({ popup: '' });
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
+    }
+
+    // パネルが開いている場合は通知
+    chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED', settings }).catch(() => { });
+  }
+});
 
 // タブ作成時に親子関係を記録
 chrome.tabs.onCreated.addListener(async (tab) => {
@@ -225,7 +278,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
 
 // タブ更新時に通知
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl || 'groupId' in changeInfo) {
+  if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl || 'groupId' in changeInfo || 'audible' in changeInfo || 'mutedInfo' in changeInfo) {
     // グループが変更された場合、すべての子孫も同じグループに入れる（ユーザーリクエスト）
     if ('groupId' in changeInfo) {
       const descendants = getDescendantIds(tabId);
@@ -336,7 +389,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'ACTIVATE_TAB':
       chrome.tabs.update(message.tabId, { active: true })
-        .then(() => chrome.windows.update(message.windowId, { focused: true }))
+        .then(() => {
+          if (message.focusWindow !== false) {
+            return chrome.windows.update(message.windowId, { focused: true });
+          }
+        })
         .then(() => sendResponse({ success: true }));
       return true;
 
@@ -517,6 +574,189 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       deleteSession(message.sessionId).then(() => sendResponse({ success: true }));
       return true;
 
+    case 'SAVE_SNIPPET':
+      (async () => {
+        try {
+          console.log("[TTM] Saving snippet:", message.snippet);
+          const result = await chrome.storage.local.get('ttm-snippets');
+          let snippets = result['ttm-snippets'];
+          if (!Array.isArray(snippets)) snippets = [];
+          snippets.unshift(message.snippet);
+          await chrome.storage.local.set({ 'ttm-snippets': snippets });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+          sendResponse({ success: true });
+        } catch (e) {
+          console.error("[TTM] Failed to save snippet:", e);
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      return true;
+
+    case 'GET_SNIPPETS':
+      chrome.storage.local.get('ttm-snippets').then(res => {
+        sendResponse({ snippets: res['ttm-snippets'] || [] });
+      });
+      return true;
+
+    case 'GET_SNIPPET_FOLDERS':
+      chrome.storage.local.get('ttm-snippet-folders').then(res => {
+        sendResponse({ folders: res['ttm-snippet-folders'] || [] });
+      });
+      return true;
+
+    case 'DELETE_SNIPPET':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippets');
+        const snippets = (result['ttm-snippets'] || []).filter(s => s.id !== message.id);
+        await chrome.storage.local.set({ 'ttm-snippets': snippets });
+        notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'UPDATE_SNIPPET':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippets');
+        let snippets = result['ttm-snippets'] || [];
+        const idx = snippets.findIndex(s => s.id === message.snippet.id);
+        if (idx !== -1) {
+          snippets[idx] = { ...snippets[idx], ...message.snippet };
+          await chrome.storage.local.set({ 'ttm-snippets': snippets });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'CREATE_SNIPPET_FOLDER':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippet-folders');
+        const folders = result['ttm-snippet-folders'] || [];
+        folders.push(message.folder);
+        await chrome.storage.local.set({ 'ttm-snippet-folders': folders });
+        notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'UPDATE_SNIPPET_FOLDER':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippet-folders');
+        let folders = result['ttm-snippet-folders'] || [];
+        const idx = folders.findIndex(f => f.id === message.id);
+        if (idx !== -1) {
+          folders[idx] = { ...folders[idx], ...message.folder };
+          await chrome.storage.local.set({ 'ttm-snippet-folders': folders });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'DELETE_SNIPPET_FOLDER':
+      (async () => {
+        const foldersResult = await chrome.storage.local.get('ttm-snippet-folders');
+        const folders = (foldersResult['ttm-snippet-folders'] || []).filter(f => f.id !== message.id);
+        await chrome.storage.local.set({ 'ttm-snippet-folders': folders });
+
+        // フォルダー内のスニペットをルートに移動
+        const snippetsResult = await chrome.storage.local.get('ttm-snippets');
+        const snippets = (snippetsResult['ttm-snippets'] || []).map(s => {
+          if (s.folderId === message.id) delete s.folderId;
+          return s;
+        });
+        await chrome.storage.local.set({ 'ttm-snippets': snippets });
+
+        notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'REORDER_SNIPPETS':
+      (async () => {
+        await chrome.storage.local.set({ 'ttm-snippets': message.snippets });
+        notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'MOVE_SNIPPET_TO_FOLDER':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippets');
+        let snippets = result['ttm-snippets'] || [];
+        const idx = snippets.findIndex(s => s.id === message.snippetId);
+        if (idx !== -1) {
+          if (message.folderId) {
+            snippets[idx].folderId = message.folderId;
+          } else {
+            delete snippets[idx].folderId;
+          }
+          await chrome.storage.local.set({ 'ttm-snippets': snippets });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'INCREMENT_SNIPPET_CLICK':
+      (async () => {
+        const result = await chrome.storage.local.get('ttm-snippets');
+        let snippets = result['ttm-snippets'] || [];
+        const idx = snippets.findIndex(s => s.id === message.id);
+        if (idx !== -1) {
+          snippets[idx].clickCount = (snippets[idx].clickCount || 0) + 1;
+          await chrome.storage.local.set({ 'ttm-snippets': snippets });
+          notifyPanels({ type: 'SNIPPETS_UPDATED' });
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
+    case 'NAVIGATE_TO_SNIPPET':
+      (async () => {
+        const { url, scrollY, text } = message;
+        const tabs = await chrome.tabs.query({});
+        let targetTab = tabs.find(t => t.url === url);
+
+        async function doScroll(tabId) {
+          try {
+            await chrome.tabs.sendMessage(tabId, { type: 'SCROLL_TO_POSITION', scrollY, text });
+          } catch (err) {
+            // Content script not loaded yet or missing, inject it then retry
+            try {
+              await chrome.scripting.executeScript({
+                target: { tabId },
+                files: ['content/snippets.js']
+              });
+            } catch (injErr) {
+              // Ignore injection errors (e.g., chrome:// pages)
+            }
+            setTimeout(() => {
+              chrome.tabs.sendMessage(tabId, { type: 'SCROLL_TO_POSITION', scrollY, text }).catch(() => {});
+            }, 500);
+          }
+        }
+
+        if (targetTab) {
+          await chrome.tabs.update(targetTab.id, { active: true });
+          await chrome.windows.update(targetTab.windowId, { focused: true });
+          // SPA may need a moment to reactive its virtual DOM after tab re-focus
+          setTimeout(() => doScroll(targetTab.id), 300);
+        } else {
+          targetTab = await chrome.tabs.create({ url });
+          const listener = (tabId, changeInfo) => {
+            if (tabId === targetTab.id && changeInfo.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(listener);
+              // Give extra time for React/SPA rendering (e.g. Gemini, Genspark)
+              setTimeout(() => doScroll(tabId), 1000);
+            }
+          };
+          chrome.tabs.onUpdated.addListener(listener);
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+
     /* cases for MINI_TREE deactivated */
     // case 'GET_MINI_TREE_DATA': ...
     // case 'MINI_TREE_ACTIVATE_TAB': ...
@@ -575,6 +815,23 @@ async function loadSessions() {
   const result = await chrome.storage.local.get('sessions');
   return result.sessions || [];
 }
+
+// 設定変更を監視して振る舞いを同期
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes['ttm-user-settings']) {
+    const newSettings = changes['ttm-user-settings'].newValue;
+    if (newSettings && newSettings.interactionMode) {
+      const mode = newSettings.interactionMode;
+      if (mode === 'popup') {
+        chrome.action.setPopup({ popup: 'sidepanel/popup.html' });
+        chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => { });
+      } else {
+        chrome.action.setPopup({ popup: '' });
+        chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
+      }
+    }
+  }
+});
 
 // セッション復元
 async function restoreSession(sessionId) {

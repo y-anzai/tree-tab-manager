@@ -492,6 +492,15 @@
   "settingsOtherTitle": {
     "message": "その他の設定"
   },
+  "settingsInteractionMode": {
+    "message": "パネルの表示方法"
+  },
+  "interactionSidepanel": {
+    "message": "サイドパネル"
+  },
+  "interactionPopup": {
+    "message": "ポップアップ"
+  },
   "settingsTabDisplayMode": {
     "message": "タブの表示モード"
   },
@@ -567,6 +576,12 @@
   "actionDisplayMode": {
     "message": "表示モード切替"
   },
+  "actionEnableExtension": {
+    "message": "拡張機能の有効化"
+  },
+  "actionChangeShortcut": {
+    "message": "変更"
+  },
   "actionSortMode": {
     "message": "ソートモード切替"
   },
@@ -606,12 +621,6 @@
   "actionSwitchSettings": {
     "message": "「設定」パネルへ"
   },
-  "actionToggleMiniTree": {
-    "message": "ミニツリー表示切替 (90px)"
-  },
-  "toolbarToggleMiniTree": {
-    "message": "ミニツリーを表示/非表示"
-  },
   "toolbarCloseOnSelect": {
     "message": "選択後にパネルを自動で閉じる (ON/OFF)"
   },
@@ -623,9 +632,6 @@
   },
   "sideRight": {
     "message": "右"
-  },
-  "settingsMiniTreeWidth": {
-    "message": "ミニツリーの幅"
   },
   "settingsFocusIntensity": {
     "message": "フォーカス効果の強度"
@@ -663,10 +669,69 @@
   "sizeLarge": {
     "message": "大"
   },
+  "shortcutToggleInteraction": {
+    "message": "パネルの表示方法の切り替え (ポップアップ/サイドパネル)"
+  },
   "toastAddedToGoogleTodo": {
     "message": "Google Todo に追加しました"
   },
   "toastGoogleTodoAddFailed": {
     "message": "Google Todo への追加に失敗しました。OAuth設定を確認してください。"
+  },
+  "navSnippets": {
+    "message": "スニペット"
+  },
+  "ctxAddSnippet": {
+    "message": "スニペットに追加"
+  },
+  "snippetNamePlaceholder": {
+    "message": "名称を入力..."
+  },
+  "snippetDescPlaceholder": {
+    "message": "説明を入力 (任意)..."
+  },
+  "toastSnippetAdded": {
+    "message": "スニペットを保存しました"
+  },
+  "emptySnippets": {
+    "message": "保存されたスニペットがありません"
+  },
+  "snippetTextPlaceholder": {
+    "message": "選択された文言"
+  },
+  "snippetUrlPlaceholder": {
+    "message": "URL"
+  },
+  "btnSaveSnippet": {
+    "message": "保存"
+  },
+  "btnCancelSnippet": {
+    "message": "キャンセル"
+  },
+  "ctxEditSnippet": {
+    "message": "スニペットを編集"
+  },
+  "snippetEditTitle": {
+    "message": "スニペットの編集"
+  },
+  "clickCountLabel": {
+    "message": "$1 回クリック",
+    "placeholders": {
+      "1": {
+        "content": "$1"
+      }
+    }
+  },
+  "navSnippetsAddFolder": {
+    "message": "フォルダ作成"
+  },
+  "folderNamePlaceholder": {
+    "message": "フォルダ名を入力..."
+  },
+  "confirmDeleteFolder": {
+    "message": "フォルダ「$1」を削除しますか？ 中身のスニペットは削除されません。"
+  },
+  "snippetSearchPlaceholder": {
+    "message": "スニペット（スクラップ）を検索..."
   }
 }

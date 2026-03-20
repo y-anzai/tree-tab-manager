@@ -6,6 +6,7 @@ const state = {
   tabs: [],           // chrome.tabs の一覧
   tabParents: {},     // tabId -> parentTabId
   tabMetadata: {},    // tabId -> { collapsed }
+  tabQuery: '',       // タブ検索クエリ
   collapseState: {},  // tabId -> collapsed (ローカル)
   activeTabId: null,
   currentWindowId: null,
@@ -23,6 +24,7 @@ const state = {
   // 履歴パネル
   historyItems: [],
   historyQuery: '',
+  historySortMode: 'recent', // 'recent' | 'most-visited'
 
   // ブックマークパネル
   bookmarkTree: null,
@@ -39,6 +41,14 @@ const state = {
   customTabNames: {},    // tabId -> customName
   tabCustomNamesByUrl: {}, // url -> customName（再訪時のため）
 
+  // スニペットパネル
+  snippets: [],
+  snippetFolders: [],
+  snippetFolderCollapseState: {},
+  snippetQuery: '',
+  currentEditSnippetId: null,
+  currentEditFolderId: null,
+
   // ユーザー設定
   userSettings: {
     historyRecentlyClosed: false,
@@ -46,31 +56,32 @@ const state = {
     themeColor: 'blue',
     colorScheme: 'auto',
     sidePanelSide: 'right',
-    miniTreeWidth: 90,
     focusIntensity: 'medium', // 'none', 'low', 'medium', 'high'
     closeOnSelect: false,
     tabSelectionAnimation: true,
     tabFontSize: 12,
     toggleSize: 'medium',
     shortcuts: {
-      'new-tab': 'Alt+N',
-      'toggle-pinned': 'Alt+P',
-      'display-mode': 'Alt+D',
-      'sort-mode': 'Alt+S',
-      'collapse-all': 'Alt+Up',
-      'expand-all': 'Alt+Down',
-      'focus-search': '/',
-      'switch-tabs': 'Alt+1',
-      'switch-history': 'Alt+2',
-      'switch-bookmarks': 'Alt+3',
-      'switch-settings': 'Alt+4',
-      // 'toggle-mini-tree': 'Cmd+Shift+X'
-    }
+      'new-tab': '',
+      'toggle-pinned': '',
+      'display-mode': '',
+      'sort-mode': '',
+      'collapse-all': '',
+      'expand-all': '',
+      'focus-search': '',
+      'switch-tabs': '',
+      'switch-history': '',
+      'switch-bookmarks': '',
+      'switch-settings': '',
+      'display-mode': '',
+    },
+    interactionMode: 'sidepanel' // 'sidepanel' | 'popup'
   },
   isRecordingShortcut: false,
 
   // タブ管理・設定
-  tabConfig: []
+  tabConfig: [],
+  isFirstLoad: true
 };
 
 // ショートカット定義
@@ -79,14 +90,8 @@ const SHORTCUT_ACTIONS = [
   { id: 'switch-history', label: chrome.i18n.getMessage('actionSwitchHistory') },
   { id: 'switch-bookmarks', label: chrome.i18n.getMessage('actionSwitchBookmarks') },
   { id: 'switch-settings', label: chrome.i18n.getMessage('actionSwitchSettings') },
-  { id: 'new-tab', label: chrome.i18n.getMessage('actionNewTab') },
   { id: 'focus-search', label: chrome.i18n.getMessage('actionFocusSearch') },
-  { id: 'toggle-pinned', label: chrome.i18n.getMessage('actionTogglePinned') },
   { id: 'display-mode', label: chrome.i18n.getMessage('actionDisplayMode') },
-  { id: 'sort-mode', label: chrome.i18n.getMessage('actionSortMode') },
-  { id: 'collapse-all', label: chrome.i18n.getMessage('actionCollapseAll') },
-  { id: 'expand-all', label: chrome.i18n.getMessage('actionExpandAll') },
-  // { id: 'toggle-mini-tree', label: chrome.i18n.getMessage('actionToggleMiniTree') }
 ];
 
 // デフォルトのタブ設定
@@ -94,6 +99,7 @@ const DEFAULT_TAB_CONFIG = [
   { id: 'tabs', label: chrome.i18n.getMessage('navTabs'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"/></svg>' },
   { id: 'history', label: chrome.i18n.getMessage('navHistory'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>' },
   { id: 'bookmarks', label: chrome.i18n.getMessage('navBookmarks'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>' },
+  { id: 'snippets', label: chrome.i18n.getMessage('navSnippets'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>' },
   { id: 'readingList', label: chrome.i18n.getMessage('navReadingList'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>' },
   { id: 'settings', label: chrome.i18n.getMessage('navSettings'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>' }
 ];
@@ -121,7 +127,7 @@ async function applyDisplayMode(mode) {
   state.displayMode = mode;
   try { await chrome.storage.local.set({ 'ttm-displayMode': mode }); } catch { }
 
-  const btn = document.getElementById('btn-toggle-mini-tree') ? document.getElementById('btn-display-mode') : document.getElementById('btn-display-mode');
+  const btn = document.getElementById('btn-display-mode');
   if (!btn) return;
   btn.innerHTML = MODE_ICONS[mode];
 
@@ -261,15 +267,6 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
   if (sel) sel.value = next;
 });
 
-/* btn-toggle-mini-tree deactivated
-document.getElementById('btn-toggle-mini-tree').addEventListener('click', () => {
-  chrome.storage.local.get('ttm-mini-tree-visible', (res) => {
-    const next = !res['ttm-mini-tree-visible'];
-    chrome.storage.local.set({ 'ttm-mini-tree-visible': next });
-  });
-});
-*/
-
 // ===== タブ並び順モード管理 =====
 // 'tree'（ツリー表示）| 'recent'（最近開いた順フラット表示）
 
@@ -366,13 +363,6 @@ function handleShortcutAction(actionId) {
     case 'expand-all':
       document.getElementById('btn-expand-all')?.click();
       break;
-    case 'toggle-mini-tree':
-      // アクティブタブのcontent scriptへトグルを送信
-      chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-        if (!tab || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) return;
-        chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_MINI_TREE' }).catch(() => { });
-      });
-      break;
   }
 }
 
@@ -468,13 +458,16 @@ async function loadUserSettings() {
     if (data['ttm-displayMode']) {
       state.displayMode = data['ttm-displayMode'];
     }
+    const pinnedData = await chrome.storage.local.get(['ttm-show-pinned-tabs']);
+    if (pinnedData['ttm-show-pinned-tabs'] !== undefined) {
+      state.showPinnedTabs = pinnedData['ttm-show-pinned-tabs'];
+    }
   } catch (e) { }
   applyColorScheme();
   // 他のコンポーネント用への同期
   chrome.storage.local.set({
     'ttm-shortcuts': state.userSettings.shortcuts || {},
-    'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
-    'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
+    'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right'
   });
 }
 
@@ -492,9 +485,20 @@ async function saveUserSettings() {
       'ttm-user-settings': state.userSettings,
       'ttm-shortcuts': state.userSettings.shortcuts || {},
       'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
-      'ttm-mini-tree-width': state.userSettings.miniTreeWidth || 90
+      'ttm-show-pinned-tabs': state.showPinnedTabs
     });
-  } catch (e) { }
+
+    // アクションボタンの振る舞いを更新
+    if (state.userSettings.interactionMode === 'popup') {
+      chrome.action.setPopup({ popup: 'sidepanel/popup.html' });
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => { });
+    } else {
+      chrome.action.setPopup({ popup: '' });
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
+    }
+  } catch (e) {
+    console.error('[TTM] Failed to save user settings:', e);
+  }
 }
 
 // ===== タブナビゲーション設定管理 =====
@@ -554,20 +558,41 @@ function renderNavTabs() {
       const panel = document.getElementById(`panel-${tab.id}`);
       if (panel) panel.classList.add('active');
 
+      // アクティブなパネルを保存
+      chrome.storage.local.set({ 'ttm-active-panel': tab.id });
+
       if (tab.id === 'history') loadHistory();
       if (tab.id === 'bookmarks') loadBookmarks();
+      if (tab.id === 'snippets') loadSnippets();
       if (tab.id === 'readingList') loadReadingList();
+      // タブパネルに切り替えたとき、ダーティなら再同期
+      if (tab.id === 'tabs' && tabsDirty) {
+        tabsDirty = false;
+        loadTabs();
+      }
     });
     nav.appendChild(btn);
   });
 
-  // Ensure an active panel exists, fallback to first visible tab
-  if (!visibleTabs.some(t => t.id === currentActive) && visibleTabs.length > 0) {
-    const firstId = visibleTabs[0].id;
-    nav.querySelector(`[data-panel="${firstId}"]`).classList.add('active');
+  // 保存されたパネルを復元、またはデフォルト
+  chrome.storage.local.get(['ttm-active-panel'], (data) => {
+    const savedPanel = data['ttm-active-panel'];
+    const targetId = (savedPanel && visibleTabs.some(t => t.id === savedPanel)) ? savedPanel : (visibleTabs[0]?.id || 'tabs');
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(`panel-${firstId}`).classList.add('active');
-  }
+
+    const targetBtn = nav.querySelector(`[data-panel="${targetId}"]`);
+    if (targetBtn) targetBtn.classList.add('active');
+    const targetPanel = document.getElementById(`panel-${targetId}`);
+    if (targetPanel) targetPanel.classList.add('active');
+
+    // 初期ロード時の読み込み
+    if (targetId === 'history') loadHistory();
+    if (targetId === 'bookmarks') loadBookmarks();
+    if (targetId === 'snippets') loadSnippets();
+    if (targetId === 'readingList') loadReadingList();
+  });
 }
 
 // ===== 設定パネル =====
@@ -741,6 +766,15 @@ function renderSettingsPanel() {
     };
   }
 
+  const selInteractionMode = document.getElementById('setting-interaction-mode');
+  if (selInteractionMode) {
+    selInteractionMode.value = state.userSettings.interactionMode || 'sidepanel';
+    selInteractionMode.onchange = (e) => {
+      state.userSettings.interactionMode = e.target.value;
+      saveUserSettings();
+    };
+  }
+
   // サイドパネルの位置設定
   const selSide = document.getElementById('setting-side-panel-side');
   if (selSide) {
@@ -748,21 +782,6 @@ function renderSettingsPanel() {
     selSide.onchange = (e) => {
       state.userSettings.sidePanelSide = e.target.value;
       saveUserSettings();
-    };
-  }
-
-  // ミニツリーの幅設定
-  const sliderWidth = document.getElementById('setting-mini-tree-width');
-  const spanWidth = document.getElementById('mini-tree-width-value');
-  if (sliderWidth && spanWidth) {
-    const val = state.userSettings.miniTreeWidth || 90;
-    sliderWidth.value = val;
-    spanWidth.textContent = `${val}px`;
-    sliderWidth.oninput = (e) => {
-      const v = parseInt(e.target.value);
-      spanWidth.textContent = `${v}px`;
-      state.userSettings.miniTreeWidth = v;
-      saveUserSettingsDebounced();
     };
   }
 
@@ -831,6 +850,43 @@ function renderShortcutsSettings() {
   if (!container) return;
   container.innerHTML = '';
 
+  // 内部ショートカットを先に描画（同期）
+  renderInternalShortcuts(container);
+
+  // 拡張機能自体の有効化やその他のグローバルショートカットを取得して先頭に挿入（非同期）
+  chrome.commands.getAll((commands) => {
+    // 逆順で先頭に追加（manifestの順序を維持気味に）
+    commands.slice().reverse().forEach(cmd => {
+      const globalItem = document.createElement('div');
+      globalItem.className = 'settings-item-normal';
+      globalItem.style.borderLeft = '4px solid var(--theme-color)';
+
+      let label = cmd.description;
+      if (!label && cmd.name === '_execute_action') label = chrome.i18n.getMessage('actionEnableExtension');
+
+      globalItem.innerHTML = `
+        <div class="settings-item-label">
+          <div style="display: flex; flex-direction: column;">
+            <span>${label || cmd.name}</span>
+            <span style="font-size: 10px; color: var(--text-muted); decoration: underline;">(Global Shortcut)</span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="shortcut-kbd-btn global-shortcut-btn">${cmd.shortcut || '---'}</span>
+          <button class="toolbar-btn primary" icon-only title="${chrome.i18n.getMessage('actionChangeShortcut')}">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+          </button>
+        </div>
+      `;
+      globalItem.querySelector('button').onclick = () => {
+        chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+      };
+      container.insertBefore(globalItem, container.firstChild);
+    });
+  });
+}
+
+function renderInternalShortcuts(container) {
   SHORTCUT_ACTIONS.forEach(action => {
     const item = document.createElement('div');
     item.className = 'settings-item-normal';
@@ -896,18 +952,12 @@ function renderShortcutsSettings() {
     resetBtn.onclick = () => {
       // デフォルトに戻す
       const defaults = {
-        'new-tab': 'Alt+N',
-        'toggle-pinned': 'Alt+P',
-        'display-mode': 'Alt+D',
-        'sort-mode': 'Alt+S',
-        'collapse-all': 'Alt+Up',
-        'expand-all': 'Alt+Down',
-        'focus-search': '/',
-        'switch-tabs': 'Alt+1',
-        'switch-history': 'Alt+2',
-        'switch-bookmarks': 'Alt+3',
-        'switch-settings': 'Alt+4',
-        'toggle-mini-tree': 'Cmd+Shift+X'
+        'switch-tabs': '',
+        'switch-history': '',
+        'switch-bookmarks': '',
+        'switch-settings': '',
+        'focus-search': '',
+        'display-mode': ''
       };
       state.userSettings.shortcuts[action.id] = defaults[action.id] || '';
       saveUserSettings();
@@ -1275,10 +1325,50 @@ function showGroupContextMenu(x, y, groupId, groupInfo) {
   ]);
 }
 
+// 指定したクエリにマッチするタブとその親タブをすべて取得
+function getMatchingTabs(tabs, query) {
+  if (!query) return null;
+  const matchIds = new Set();
+  const tabMap = new Map(tabs.map(t => [t.id, t]));
+
+  tabs.forEach(tab => {
+    const isMatch = tab.title.toLowerCase().includes(query) ||
+      tab.url.toLowerCase().includes(query) ||
+      (state.customTabNames[tab.id] || '').toLowerCase().includes(query);
+
+    if (isMatch) {
+      matchIds.add(tab.id);
+      // 親をすべて追加
+      let pid = state.tabParents[tab.id];
+      while (pid && tabMap.has(pid)) {
+        matchIds.add(pid);
+        pid = state.tabParents[pid];
+      }
+    }
+  });
+  return matchIds;
+}
+
 // タブツリーを描画
 function renderTabTree() {
   const container = document.getElementById('tab-tree');
-  const { pinnedRoots } = buildTabTree(state.tabs, state.tabParents);
+  const matchIds = getMatchingTabs(state.tabs, state.tabQuery);
+  const filteredTabs = matchIds ? state.tabs.filter(t => matchIds.has(t.id)) : state.tabs;
+  let { roots, pinnedRoots } = buildTabTree(filteredTabs, state.tabParents);
+
+  // 検索時、マッチした親タブを強制的に展開する
+  if (matchIds) {
+    const expandMatchingParents = (nodes) => {
+      nodes.forEach(node => {
+        if (node.children.length > 0) {
+          state.collapseState[node.id] = false;
+          expandMatchingParents(node.children);
+        }
+      });
+    };
+    expandMatchingParents(roots);
+    expandMatchingParents(pinnedRoots);
+  }
 
   // 固定タブ合計（子孫含む）
   const pinnedTotal = pinnedRoots.reduce((n, t) => n + 1 + countDescendants(t), 0);
@@ -1326,6 +1416,7 @@ function renderTabTree() {
 
     label.addEventListener('click', () => {
       state.showPinnedTabs = !state.showPinnedTabs;
+      saveUserSettings();
       renderTabTree();
     });
 
@@ -1339,7 +1430,7 @@ function renderTabTree() {
     container.appendChild(pinnedSection);
   }
 
-  const normalTabs = state.tabs.filter(t => !t.pinned);
+  const normalTabs = filteredTabs.filter(t => !t.pinned);
 
   if (state.tabSortMode === 'recent') {
     // 最近開いた順（フラット表示、インデントなし）
@@ -1404,7 +1495,15 @@ function renderTabNode(container, tab, depth) {
 
 function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) {
   const item = document.createElement('div');
-  item.className = `tab-item${tab.id === state.activeTabId ? ' active-tab' : ''}${tab.pinned ? ' pinned-tab' : ''}`;
+
+  // 検索クエリへの直接マッチを判定
+  const isMatch = state.tabQuery && (
+    tab.title.toLowerCase().includes(state.tabQuery) ||
+    tab.url.toLowerCase().includes(state.tabQuery) ||
+    (state.customTabNames[tab.id] || '').toLowerCase().includes(state.tabQuery)
+  );
+
+  item.className = `tab-item${tab.id === state.activeTabId ? ' active-tab' : ''}${tab.pinned ? ' pinned-tab' : ''}${isMatch ? ' search-match' : ''}`;
   if (state.lastMovedTabIds.includes(tab.id)) {
     item.className += ' animating-child';
     // 次回のレンダリングで繰り返さないよう、少し遅れてクリア
@@ -1433,11 +1532,6 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
         <polyline points="4 6 8 10 12 6"></polyline>
       </svg>
     </div>
-    <button class="tab-action-btn close-btn left-action" data-action="close" title="${chrome.i18n.getMessage('ctxClose')}">
-      <svg viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-      </svg>
-    </button>
     <div class="tab-content-wrapper">
       ${groupDotHtml}
       ${faviconUrl
@@ -1447,7 +1541,9 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
       ${!faviconUrl ? getDefaultFavicon() : `<span class="tab-favicon-default" style="display:none">${getDefaultFavicon()}</span>`}
       ${tab.pinned ? '<svg class="tab-pin-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/></svg>' : ''}
       <div class="tab-info">
-        <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">${escapeHtml(getTabDisplayName(tab))}</div>
+        <div class="tab-title" title="${escapeHtml(getTabDisplayName(tab))}">
+          ${tab.audible ? `<svg class="tab-audio-icon" viewBox="0 0 20 20" fill="currentColor" title="再生中"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clip-rule="evenodd"/></svg>` : ''}${escapeHtml(getTabDisplayName(tab))}
+        </div>
         ${!tab.pinned ? `<div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>` : ''}
         ${(() => {
       const taskInfo = state.googleTasks[tab.url];
@@ -1468,6 +1564,11 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
             <path d="M7 5A3 3 0 0 1 13 5A3 3 0 0 1 7 5ZM9 8H11V14H9ZM9 14L10 17L11 14Z"/>
           </svg>
         </button>` : ''}
+        <button class="tab-action-btn close-btn" data-action="close" title="${chrome.i18n.getMessage('ctxClose')}">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
         ${hasChildren ? (() => {
       const total = countDescendants(tab);
       return `<button class="tab-action-btn close-tree-btn" data-action="close-tree" title="${chrome.i18n.getMessage('ctxCloseTree')} (${total + 1}${chrome.i18n.getMessage('tabsText')})">
@@ -1484,10 +1585,12 @@ function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) 
     </div>
   `;
 
-  // アクティブタブにスクロール
+  /* 
+  // アクティブタブにスクロール (ユーザーリクエストにより、更新時の自動スクロールを無効化)
   if (tab.id === state.activeTabId) {
     setTimeout(() => item.scrollIntoView({ block: 'nearest' }), 100);
   }
+  */
 
   // クリックでタブをアクティブ化（親選択モード中は親を設定）
   item.addEventListener('click', (e) => {
@@ -2082,7 +2185,11 @@ async function activateTab(tabId, windowId) {
     state.tabActivationTime[tabId] = Date.now();
     try { localStorage.setItem(`ttm-tab-activation-${tabId}`, state.tabActivationTime[tabId]); } catch { }
 
-    await sendMessage('ACTIVATE_TAB', { tabId, windowId });
+    await sendMessage('ACTIVATE_TAB', {
+      tabId,
+      windowId,
+      focusWindow: !!state.userSettings.closeOnSelect
+    });
 
     // 設定が有効な場合、サイドパネルを閉じる
     if (state.userSettings.closeOnSelect) {
@@ -2374,13 +2481,44 @@ async function loadTabs() {
   }
 
   try {
-    const resp = await sendMessage('GET_TAB_PARENTS');
-    state.tabParents = resp?.parents || {};
+    const [parentsResp, metaResp] = await Promise.all([
+      sendMessage('GET_TAB_PARENTS'),
+      sendMessage('GET_TAB_METADATA')
+    ]);
+    state.tabParents = parentsResp?.parents || {};
+
+    // 折りたたみ状態を復元
+    const metadata = metaResp?.metadata || {};
+    Object.entries(metadata).forEach(([id, meta]) => {
+      if (meta.collapsed !== undefined) {
+        state.collapseState[id] = meta.collapsed;
+      }
+    });
   } catch {
     state.tabParents = {};
   }
 
   renderTabTree();
+
+  // 初回ロード時のみアクティブタブまでスクロール & 親を開く
+  if (state.isFirstLoad && state.activeTabId) {
+    state.isFirstLoad = false;
+    setTimeout(() => {
+      const activeItem = document.querySelector(`.tab-item[data-tab-id="${state.activeTabId}"]`);
+      if (activeItem) {
+        // 親を辿って展開
+        let parent = activeItem.closest('.tab-node')?.parentElement?.closest('.tab-node');
+        while (parent) {
+          const parentId = parent.dataset.tabId;
+          if (parentId && state.collapseState[parentId]) {
+            toggleTabCollapse(parentId); // 展開
+          }
+          parent = parent.parentElement?.closest('.tab-node');
+        }
+        activeItem.scrollIntoView({ block: 'nearest' });
+      }
+    }, 200);
+  }
 }
 
 async function refreshTabTree() {
@@ -2391,6 +2529,18 @@ async function refreshTabTree() {
 document.getElementById('btn-new-tab').addEventListener('click', () => {
   sendMessage('NEW_TAB', {});
 });
+
+let tabSearchTimeout = null;
+const tabSearchInput = document.getElementById('tab-search');
+if (tabSearchInput) {
+  tabSearchInput.addEventListener('input', (e) => {
+    state.tabQuery = e.target.value.toLowerCase();
+    clearTimeout(tabSearchTimeout);
+    tabSearchTimeout = setTimeout(() => {
+      renderTabTree();
+    }, 200);
+  });
+}
 document.getElementById('btn-toggle-close-on-select').addEventListener('click', () => {
   state.userSettings.closeOnSelect = !state.userSettings.closeOnSelect;
   saveUserSettings();
@@ -2516,6 +2666,12 @@ async function loadHistory(query = '') {
 function renderHistory(items, query = '', recentSessions = []) {
   const container = document.getElementById('history-list');
 
+  // ソート適用
+  let sortedItems = [...items];
+  if (state.historySortMode === 'most-visited') {
+    sortedItems.sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0));
+  }
+
   if (items.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd"/></svg>
@@ -2630,7 +2786,7 @@ function renderHistory(items, query = '', recentSessions = []) {
 
       el.addEventListener('click', (e) => {
         if (e.target.closest('.history-remove')) return;
-        chrome.tabs.create({ url: item.url });
+        chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
         // 最近使用したブックマーク更新
         updateRecentlyUsed(item.url);
 
@@ -2672,6 +2828,16 @@ document.getElementById('history-search').addEventListener('input', (e) => {
 document.getElementById('btn-refresh-history').addEventListener('click', () => {
   const query = document.getElementById('history-search').value.trim();
   loadHistory(query);
+});
+
+// 履歴ソート
+document.querySelectorAll('#panel-history .sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#panel-history .sort-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.historySortMode = btn.dataset.sort;
+    loadHistory(document.getElementById('history-search').value.trim());
+  });
 });
 
 // ===== ブックマークパネル =====
@@ -2733,7 +2899,7 @@ function navigateToBookmarkFolder(folderId, pathIds) {
   state.bookmarkFolderState[folderId] = false;
 
   // UIのソートボタン状態を更新
-  document.querySelectorAll('.sort-btn').forEach(btn => {
+  document.querySelectorAll('#panel-bookmarks .sort-btn').forEach(btn => {
     if (btn.parentNode.id === 'bookmark-sort-modes') {
       btn.classList.toggle('active', btn.dataset.sort === 'tree');
     }
@@ -2864,7 +3030,7 @@ function createBookmarkItem(item, query = '') {
       return;
     }
 
-    chrome.tabs.create({ url: item.url });
+    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
     updateRecentlyUsed(item.url);
 
     if (state.userSettings.closeOnSelect) {
@@ -3018,9 +3184,9 @@ function updateVisitCountToggleBtn() {
   }
 }
 
-document.querySelectorAll('.sort-btn').forEach(btn => {
+document.querySelectorAll('#panel-bookmarks .sort-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#panel-bookmarks .sort-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.bookmarkSortMode = btn.dataset.sort;
     updateVisitCountToggleBtn();
@@ -3176,6 +3342,8 @@ if (chrome.readingList) {
 }
 
 // ===== バックグラウンドからのメッセージ受信 =====
+let tabsDirty = false; // タブパネルが非表示のときに更新があったフラグ
+
 chrome.runtime.onMessage.addListener((message) => {
   switch (message.type) {
     case 'TAB_CREATED':
@@ -3183,9 +3351,12 @@ chrome.runtime.onMessage.addListener((message) => {
     case 'TAB_UPDATED':
     case 'TAB_MOVED':
     case 'TREE_UPDATED':
-      // タブパネルが表示中なら更新
+    case 'TAB_ATTACHED':
+      // タブパネルが表示中なら即時更新、非表示ならダーティフラグを立てる
       if (document.getElementById('panel-tabs').classList.contains('active')) {
         loadTabs();
+      } else {
+        tabsDirty = true; // パネルが開かれたときに同期させる
       }
       break;
 
@@ -3198,6 +3369,15 @@ chrome.runtime.onMessage.addListener((message) => {
 
     case 'GOOGLE_TASKS_UPDATED':
       refreshGoogleTasks();
+      break;
+
+    case 'SETTINGS_UPDATED':
+      state.userSettings = { ...state.userSettings, ...message.settings };
+      renderSettingsPanel();
+      break;
+
+    case 'SNIPPETS_UPDATED':
+      loadSnippets();
       break;
   }
 });
@@ -3231,19 +3411,7 @@ async function refreshGoogleTasks() {
 init().catch(console.error);
 
 
-// ===== i18n Localization =====
-function localizeHtmlPage() {
-  document.documentElement.lang = chrome.i18n.getUILanguage().split('-')[0];
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.innerHTML = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
-  });
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    el.title = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
-  });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    el.placeholder = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
-  });
-}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', localizeHtmlPage);
 } else {
@@ -3264,6 +3432,69 @@ function stopRecentTimeUpdateTimer() {
     recentTimeUpdateInterval = null;
   }
 }
+
+// ===== タブリスト同期ウォッチドッグ =====
+// バックグラウンドのサービスワーカーが停止中にイベントを逃した場合でも
+// 実際のタブリストとパネル表示を定期的に照合・同期する
+
+let tabSyncInterval = null;
+let lastKnownTabSyncTime = 0;
+
+async function checkAndSyncTabList() {
+  // タブパネルが非表示なら何もしない
+  const tabPanel = document.getElementById('panel-tabs');
+  if (!tabPanel || !tabPanel.classList.contains('active')) return;
+
+  try {
+    const realTabs = await chrome.tabs.query({ currentWindow: true });
+    const realIds = new Set(realTabs.map(t => t.id));
+    const stateIds = new Set(state.tabs.map(t => t.id));
+
+    let needSync = false;
+
+    // 実際に存在しないタブが state にある → 吹っ飛び検出
+    if (state.tabs.some(t => !realIds.has(t.id))) needSync = true;
+    // 実際には存在するタブが state にない → 追加検出
+    if (realTabs.some(t => !stateIds.has(t.id))) needSync = true;
+    // 件数が違う
+    if (realTabs.length !== state.tabs.length) needSync = true;
+
+    if (needSync) {
+      console.log('[TTM] Tab sync: drift detected, reloading tabs...');
+      await loadTabs();
+    }
+  } catch (e) {
+    // 無視（拡張機能コンテキスト無効など）
+  }
+
+  lastKnownTabSyncTime = Date.now();
+}
+
+function startTabSyncWatchdog() {
+  if (tabSyncInterval) return;
+  // 30秒ごとに照合
+  tabSyncInterval = setInterval(checkAndSyncTabList, 30000);
+}
+
+function stopTabSyncWatchdog() {
+  if (tabSyncInterval) {
+    clearInterval(tabSyncInterval);
+    tabSyncInterval = null;
+  }
+}
+
+// ウォッチドッグを開始
+startTabSyncWatchdog();
+
+// タブパネルが再度フォーカスされたとき（ウィンドウ復帰時）に即時照合
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    // 最終同期から5秒以上経っていたら即時チェック
+    if (Date.now() - lastKnownTabSyncTime > 5000) {
+      checkAndSyncTabList();
+    }
+  }
+});
 
 function applyToggleSize() {
   const size = state.userSettings.toggleSize || 'medium';
@@ -3323,3 +3554,320 @@ window.addEventListener('focus', updateFocusState);
 window.addEventListener('blur', updateFocusState);
 // 初期実行
 updateFocusState();
+// ===== スニペット管理 =====
+async function loadSnippets() {
+  try {
+    const [snipRes, foldRes] = await Promise.all([
+      sendMessage('GET_SNIPPETS'),
+      sendMessage('GET_SNIPPET_FOLDERS')
+    ]);
+    state.snippets = snipRes.snippets || [];
+    state.snippetFolders = foldRes.folders || [];
+    renderSnippets();
+  } catch (e) {
+    const container = document.getElementById('snippet-list');
+    if (container) container.innerHTML = `<div class="empty-state">${chrome.i18n.getMessage('emptySnippets')}</div>`;
+  }
+}
+
+function renderSnippets() {
+  const container = document.getElementById('snippet-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const q = state.snippetQuery.toLowerCase();
+
+  // フォルダをレンダリング
+  state.snippetFolders.forEach(folder => {
+    const folderSnippets = state.snippets.filter(s => s.folderId === folder.id);
+    const matchesFolder = folder.name.toLowerCase().includes(q);
+    const matchedSnippets = folderSnippets.filter(s => 
+      s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q)
+    );
+
+    if (q && !matchesFolder && matchedSnippets.length === 0) return;
+
+    const folderEl = document.createElement('div');
+    const isCollapsed = state.snippetFolderCollapseState[folder.id];
+    folderEl.className = `snippet-folder ${isCollapsed ? 'collapsed' : ''}`;
+    folderEl.dataset.folderId = folder.id;
+
+    folderEl.innerHTML = `
+      <div class="snippet-folder-header">
+        <svg class="snippet-folder-toggle" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+        </svg>
+        <svg class="snippet-folder-icon" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+        </svg>
+        <span class="snippet-folder-title">${escapeHtml(folder.name)}</span>
+        <div class="snippet-folder-actions">
+          <button class="list-item-btn btn-edit-folder" title="${chrome.i18n.getMessage('ctxEdit')}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </button>
+          <button class="list-item-btn btn-delete-folder" title="${chrome.i18n.getMessage('ctxDelete')}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="snippet-folder-content"></div>
+    `;
+
+    const header = folderEl.querySelector('.snippet-folder-header');
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.snippet-folder-actions')) return;
+      state.snippetFolderCollapseState[folder.id] = !state.snippetFolderCollapseState[folder.id];
+      folderEl.classList.toggle('collapsed');
+    });
+
+    header.querySelector('.btn-edit-folder').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditFolderModal(folder);
+    });
+
+    header.querySelector('.btn-delete-folder').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm(chrome.i18n.getMessage('confirmDeleteFolder', [folder.name]))) {
+        await sendMessage('DELETE_SNIPPET_FOLDER', { id: folder.id });
+      }
+    });
+
+    // ドラッグ＆ドロップ (フォルダへの移動)
+    header.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      header.classList.add('drag-over');
+    });
+    header.addEventListener('dragleave', () => header.classList.remove('drag-over'));
+    header.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      header.classList.remove('drag-over');
+      const snippetId = e.dataTransfer.getData('text/plain');
+      if (snippetId) {
+        await sendMessage('MOVE_SNIPPET_TO_FOLDER', { snippetId, folderId: folder.id });
+      }
+    });
+
+    const content = folderEl.querySelector('.snippet-folder-content');
+    const displaySnippets = q ? matchedSnippets : folderSnippets;
+    displaySnippets.forEach(s => content.appendChild(createSnippetItem(s)));
+
+    container.appendChild(folderEl);
+  });
+
+  // ルートのスニペット
+  const rootSnippets = state.snippets.filter(s => !s.folderId);
+  rootSnippets.forEach(s => {
+    if (q && !s.name.toLowerCase().includes(q) && !(s.description || '').toLowerCase().includes(q)) return;
+    container.appendChild(createSnippetItem(s));
+  });
+
+  // ドラッグ＆ドロップ (ルートへの移動)
+  container.addEventListener('dragover', (e) => {
+    if (e.target === container) {
+      e.preventDefault();
+    }
+  });
+  container.addEventListener('drop', async (e) => {
+    if (e.target === container) {
+      e.preventDefault();
+      const snippetId = e.dataTransfer.getData('text/plain');
+      if (snippetId) {
+        await sendMessage('MOVE_SNIPPET_TO_FOLDER', { snippetId, folderId: null });
+      }
+    }
+  });
+
+  if (container.children.length === 0) {
+    container.innerHTML = `<div class="empty-state">${chrome.i18n.getMessage('emptySnippets')}</div>`;
+  }
+}
+
+function createSnippetItem(s) {
+  const item = document.createElement('div');
+  item.className = 'list-item snippet-item';
+  item.draggable = true;
+  item.dataset.id = s.id;
+  
+  const clickCount = s.clickCount || 0;
+  item.innerHTML = `
+    <div class="list-item-icon">
+      <img src="${getFaviconUrl(s.url)}" onerror="this.src='../icons/icon16.png'">
+    </div>
+    <div class="list-item-content">
+      <div class="list-item-title">${escapeHtml(s.name)}</div>
+      <div class="list-item-url">${escapeHtml(s.description || s.text.substring(0, 100))}</div>
+      <div class="snippet-meta">
+        <span class="click-count">${chrome.i18n.getMessage('clickCountLabel', [clickCount])}</span>
+        <span class="snippet-date">${new Date(s.timestamp).toLocaleDateString()}</span>
+      </div>
+    </div>
+    <div class="list-item-actions">
+      <button class="list-item-btn btn-copy-snippet" title="テキストをコピー">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      </button>
+      <button class="list-item-btn btn-copy-snippet-url" title="${chrome.i18n.getMessage('ctxCopyUrl')}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+      </button>
+      <button class="list-item-btn btn-edit-snippet" title="${chrome.i18n.getMessage('ctxEdit')}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      </button>
+      <button class="list-item-btn btn-delete-snippet" title="${chrome.i18n.getMessage('ctxDelete')}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+      </button>
+    </div>
+  `;
+
+  item.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', s.id);
+    item.classList.add('dragging');
+  });
+  item.addEventListener('dragend', () => item.classList.remove('dragging'));
+
+  item.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    item.classList.add('drag-over');
+  });
+  item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+  item.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    item.classList.remove('drag-over');
+    const draggedId = e.dataTransfer.getData('text/plain');
+    if (draggedId && draggedId !== s.id) {
+      // 物理的な並び替え
+      const snippets = [...state.snippets];
+      const fromIdx = snippets.findIndex(x => x.id === draggedId);
+      const toIdx = snippets.findIndex(x => x.id === s.id);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const item = snippets.splice(fromIdx, 1)[0];
+        // 同じ階層（同じフォルダ内または両方ルート）であれば単純移動
+        item.folderId = s.folderId;
+        snippets.splice(toIdx, 0, item);
+        await sendMessage('REORDER_SNIPPETS', { snippets });
+      }
+    }
+  });
+
+  item.addEventListener('click', (e) => {
+    if (e.target.closest('.list-item-actions')) return;
+    sendMessage('INCREMENT_SNIPPET_CLICK', { id: s.id });
+    sendMessage('NAVIGATE_TO_SNIPPET', { url: s.url, scrollY: s.scrollY, text: s.text });
+  });
+
+  item.querySelector('.btn-copy-snippet').addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(s.text).then(() => {
+      showToast("Copied to clipboard!");
+    });
+  });
+
+  item.querySelector('.btn-copy-snippet-url').addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(s.url).then(() => {
+      showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success');
+    });
+  });
+
+  item.querySelector('.btn-edit-snippet').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openEditSnippetModal(s);
+  });
+
+  item.querySelector('.btn-delete-snippet').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (confirm(chrome.i18n.getMessage('confirmDeleteBookmark', [s.name]))) {
+      await sendMessage('DELETE_SNIPPET', { id: s.id });
+    }
+  });
+
+  return item;
+}
+
+function openEditSnippetModal(snippet) {
+  state.currentEditSnippetId = snippet.id;
+  document.getElementById('edit-snippet-name').value = snippet.name;
+  document.getElementById('edit-snippet-url').value = snippet.url || '';
+  document.getElementById('edit-snippet-text').value = snippet.text || '';
+  document.getElementById('edit-snippet-desc').value = snippet.description || '';
+  document.getElementById('modal-snippet-edit').classList.remove('hidden');
+}
+
+document.getElementById('btn-save-edit-snippet')?.addEventListener('click', async () => {
+  if (!state.currentEditSnippetId) return;
+  const name = document.getElementById('edit-snippet-name').value.trim();
+  const url = document.getElementById('edit-snippet-url').value.trim();
+  const text = document.getElementById('edit-snippet-text').value.trim();
+  const description = document.getElementById('edit-snippet-desc').value.trim();
+  
+  await sendMessage('UPDATE_SNIPPET', {
+    snippet: {
+      id: state.currentEditSnippetId,
+      name: name,
+      url: url,
+      text: text,
+      description: description
+    }
+  });
+  
+  document.getElementById('modal-snippet-edit').classList.add('hidden');
+  state.currentEditSnippetId = null;
+});
+
+// フォルダ作成・編集
+function openEditFolderModal(folder = null) {
+  state.currentEditFolderId = folder ? folder.id : null;
+  document.getElementById('folder-modal-title').textContent = folder ? chrome.i18n.getMessage('snippetEditTitle') : chrome.i18n.getMessage('navSnippetsAddFolder');
+  document.getElementById('edit-folder-name').value = folder ? folder.name : '';
+  document.getElementById('modal-folder-edit').classList.remove('hidden');
+}
+
+document.getElementById('btn-add-snippet-folder')?.addEventListener('click', () => {
+  openEditFolderModal();
+});
+
+document.getElementById('btn-save-folder')?.addEventListener('click', async () => {
+  const name = document.getElementById('edit-folder-name').value.trim();
+  if (!name) return;
+
+  if (state.currentEditFolderId) {
+    await sendMessage('UPDATE_SNIPPET_FOLDER', {
+      id: state.currentEditFolderId,
+      folder: { name }
+    });
+  } else {
+    await sendMessage('CREATE_SNIPPET_FOLDER', {
+      folder: {
+        id: 'fold_' + Date.now(),
+        name: name
+      }
+    });
+  }
+
+  document.getElementById('modal-folder-edit').classList.add('hidden');
+  state.currentEditFolderId = null;
+});
+
+const snippetSearch = document.getElementById('snippet-search');
+if (snippetSearch) {
+  snippetSearch.oninput = (e) => {
+    state.snippetQuery = e.target.value;
+    renderSnippets();
+  };
+}
+
+// ===== i18n Localization =====
+function localizeHtmlPage() {
+  document.documentElement.lang = chrome.i18n.getUILanguage().split('-')[0];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    // スニペット等の要素も個別に処理される
+    const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+    if (msg) el.innerHTML = msg;
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
+    if (msg) el.title = msg;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
+    if (msg) el.placeholder = msg;
+  });
+}
