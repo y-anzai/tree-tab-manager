@@ -1148,6 +1148,104 @@ body[data-toggle-size="large"] .tab-toggle svg {
   background: var(--bg-hover);
 }
 
+/* ===== ブックマーククラウド ===== */
+.cloud-toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
+}
+
+.cloud-sort-btn {
+  padding: 3px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.cloud-sort-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.cloud-sort-btn.active {
+  background: var(--bg-active);
+  color: var(--theme-color);
+  border-color: var(--theme-color);
+  font-weight: 600;
+}
+
+.bookmark-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px; /* 8px -> 4px */
+  padding: 8px; /* 12px -> 8px */
+  align-content: flex-start;
+  justify-content: center; /* 中央寄せで密度感を出す */
+}
+
+.cloud-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px; /* 6px -> 4px */
+  padding: 4px 8px; /* 6px 12px -> 4px 8px */
+  background: var(--bg-tertiary); /* 通常は控えめな背景 */
+  border: none;
+  border-radius: 12px; /* 20px -> 12px (more compact) */
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: all var(--transition);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 100%;
+  box-shadow: 0 1px 2px var(--shadow); /* 高級感のための微細な影 */
+}
+
+.cloud-item:hover {
+  background: var(--bg-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 10;
+}
+
+.cloud-item.premium {
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--theme-color) 15%, transparent);
+}
+
+.cloud-item .bookmark-favicon {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.cloud-item .cloud-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cloud-item .cloud-count {
+  font-size: 0.7em;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.15);
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-left: 2px;
+  opacity: 0.8;
+  font-weight: normal;
+}
+
+.cloud-item:hover .cloud-count {
+  opacity: 1;
+  color: var(--theme-color);
+}
+
 .bookmark-favicon {
   width: 14px;
   height: 14px;

@@ -77,6 +77,9 @@
   "sortTreeTooltip": {
     "message": "並び順: ツリー（クリックで最近開いた順に）"
   },
+  "sortCloud": {
+    "message": "クラウド"
+  },
   "sortRecentTooltip": {
     "message": "並び順: 最近開いた順（クリックでツリー順に戻す）"
   },

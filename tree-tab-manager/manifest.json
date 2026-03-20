@@ -51,9 +51,7 @@
   "side_panel": {
     "default_path": "sidepanel/index.html"
   },
-  "chrome_url_overrides": {
-    "newtab": "newtab/index.html"
-  },
+
   "background": {
     "service_worker": "background.js"
   },

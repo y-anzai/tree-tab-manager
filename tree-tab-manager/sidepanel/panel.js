@@ -28,7 +28,8 @@ const state = {
 
   // ブックマークパネル
   bookmarkTree: null,
-  bookmarkSortMode: 'recent-used', // 'recent-used' | 'recent-added' | 'most-visited' | 'tree'
+  bookmarkSortMode: 'recent-used', // 'recent-used' | 'recent-added' | 'most-visited' | 'tree' | 'cloud'
+  bookmarkCloudSortMode: 'most-visited', // 'recent-used' | 'recent-added' | 'most-visited'
   bookmarkQuery: '',
   bookmarkFlatList: [],   // フラット化したブックマークリスト
   bookmarkFolderState: {}, // folderId -> collapsed
@@ -2959,6 +2960,9 @@ function renderBookmarks() {
       const cb = state.visitCountMap[b.url] || 0;
       return cb - ca;
     });
+  } else if (state.bookmarkSortMode === 'cloud') {
+    renderBookmarkCloud(container, items);
+    return;
   }
 
   if (items.length === 0) {
@@ -2974,6 +2978,178 @@ function renderBookmarks() {
     const el = createBookmarkItem(item, query);
     container.appendChild(el);
   });
+}
+
+function renderBookmarkCloud(container, items) {
+  container.innerHTML = '';
+
+  if (items.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>
+      <p>${chrome.i18n.getMessage('emptyBookmarks')}</p>
+    </div>`;
+    return;
+  }
+
+  // 内部ツールバー
+  const toolbar = document.createElement('div');
+  toolbar.className = 'cloud-toolbar';
+  toolbar.innerHTML = `
+    <button class="cloud-sort-btn ${state.bookmarkCloudSortMode === 'most-visited' ? 'active' : ''}" data-sort="most-visited">
+      ${chrome.i18n.getMessage('sortMostVisited')}
+    </button>
+    <button class="cloud-sort-btn ${state.bookmarkCloudSortMode === 'recent-used' ? 'active' : ''}" data-sort="recent-used">
+      ${chrome.i18n.getMessage('sortRecentUsed')}
+    </button>
+    <button class="cloud-sort-btn ${state.bookmarkCloudSortMode === 'recent-added' ? 'active' : ''}" data-sort="recent-added">
+      ${chrome.i18n.getMessage('sortRecentAdded')}
+    </button>
+  `;
+  toolbar.querySelectorAll('.cloud-sort-btn').forEach(btn => {
+    btn.onclick = () => {
+      state.bookmarkCloudSortMode = btn.dataset.sort;
+      renderBookmarkCloud(container, items);
+    };
+  });
+  container.appendChild(toolbar);
+
+  const cloudContainer = document.createElement('div');
+  cloudContainer.className = 'bookmark-cloud';
+
+  // ソート
+  let sortedItems = [...items];
+  if (state.bookmarkCloudSortMode === 'recent-used') {
+    sortedItems.sort((a, b) => (state.recentlyUsedBookmarks[b.url] || 0) - (state.recentlyUsedBookmarks[a.url] || 0));
+  } else if (state.bookmarkCloudSortMode === 'recent-added') {
+    sortedItems.sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0));
+  } else {
+    // デフォルト: 頻度順
+    sortedItems.sort((a, b) => (state.visitCountMap[b.url] || 0) - (state.visitCountMap[a.url] || 0));
+  }
+
+  // 重み付け（サイズ計算）用には全アイテムの中の最大最小を使用し、リスト自体はソート順に表示する
+  const counts = sortedItems.map(item => state.visitCountMap[item.url] || 0);
+  const maxCount = Math.max(...counts, 1);
+  const minCount = Math.min(...counts);
+
+  sortedItems.forEach(item => {
+    const el = createCloudItem(item, maxCount, minCount);
+    cloudContainer.appendChild(el);
+  });
+
+  container.appendChild(cloudContainer);
+}
+
+function createCloudItem(item, maxCount, minCount) {
+  const el = document.createElement('div');
+  el.className = 'cloud-item';
+  
+  const count = state.visitCountMap[item.url] || 0;
+  const weight = maxCount > 0 ? (Math.log(count + 1) / Math.log(maxCount + 1)) : 0.5;
+  
+  const fontSize = 10 + (weight * 8);
+  el.style.fontSize = `${fontSize}px`;
+  
+  // 透明度や色を訪問回数に応じて調整（高級感のあるグラデーションの準備）
+  if (weight > 0.6) {
+    el.style.fontWeight = '600';
+    el.classList.add('premium');
+  }
+  
+  // 訪問回数が多いほど背景を強調
+  const opacity = 0.05 + (weight * 0.15);
+  el.style.background = `linear-gradient(135deg, color-mix(in srgb, var(--theme-color) ${Math.round(opacity * 100)}%, var(--bg-tertiary)), var(--bg-tertiary))`;
+
+  const faviconUrl = getFaviconUrl(item.url);
+  const rawTitle = item.title || item.url;
+  const displayTitle = rawTitle.length > 20 ? rawTitle.substring(0, 20) + '...' : rawTitle;
+
+  el.innerHTML = `
+    ${faviconUrl 
+      ? `<img class="bookmark-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
+      : `<svg class="bookmark-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
+    }
+    <span class="cloud-title">${escapeHtml(displayTitle)}</span>
+    ${count > 0 ? `<span class="cloud-count">${count}</span>` : ''}
+  `;
+
+  el.addEventListener('click', (e) => {
+    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
+    updateRecentlyUsed(item.url);
+    if (state.userSettings.closeOnSelect) {
+      window.close();
+    }
+  });
+
+  // コンテキストメニュー共通化（createBookmarkItemからコピペに近いが、itemを渡すだけ）
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    // 既存のコンテキストメニューロジックを使用
+    handleBookmarkContextMenu(e, item);
+  });
+
+  return el;
+}
+
+// 既存の createBookmarkItem 内のコンテキストメニュー処理を共通化するために抽出する必要があるが、
+// 面倒な場合はとりあえず el.addEventListener('contextmenu', ...) の中身をここに書く。
+// 今回は panel.js を大規模に修正するのを避けるため、createBookmarkItem の方を修正して共通関数を呼ぶようにする。
+
+function handleBookmarkContextMenu(e, item) {
+  e.preventDefault();
+  showContextMenu(e.clientX, e.clientY, [
+    {
+      label: chrome.i18n.getMessage('ctxOpenNewTab'),
+      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/></svg>`,
+      action: () => chrome.tabs.create({ url: item.url })
+    },
+    {
+      label: chrome.i18n.getMessage('ctxCopyUrl'),
+      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/></svg>`,
+      action: () => {
+        navigator.clipboard.writeText(item.url).then(() => showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success'));
+      }
+    },
+    { separator: true },
+    {
+      label: chrome.i18n.getMessage('ctxEdit'),
+      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
+      action: async () => {
+        const newTitle = prompt(chrome.i18n.getMessage('promptNewTitle'), item.title);
+        if (newTitle === null) return;
+        const newUrl = prompt(chrome.i18n.getMessage('promptNewUrl'), item.url);
+        if (newUrl === null) return;
+
+        try {
+          await chrome.bookmarks.update(item.id, { title: newTitle, url: newUrl });
+          showToast(chrome.i18n.getMessage('toastBookmarkUpdated'), 'success');
+          state.bookmarkTree = null;
+          loadBookmarks();
+        } catch (err) {
+          console.error('Failed to update bookmark', err);
+          showToast(chrome.i18n.getMessage('toastBookmarkUpdateFailed'), 'error');
+        }
+      }
+    },
+    {
+      label: chrome.i18n.getMessage('ctxDelete'),
+      icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+      danger: true,
+      action: async () => {
+        if (confirm(chrome.i18n.getMessage('confirmDeleteBookmark', [item.title || item.url]))) {
+          try {
+            await chrome.bookmarks.remove(item.id);
+            showToast(chrome.i18n.getMessage('toastBookmarkDeleted'), 'success');
+            state.bookmarkTree = null;
+            loadBookmarks();
+          } catch (err) {
+            console.error('Failed to remove bookmark', err);
+            showToast(chrome.i18n.getMessage('toastBookmarkDeleteFailed'), 'error');
+          }
+        }
+      }
+    }
+  ]);
 }
 
 function createBookmarkItem(item, query = '') {
@@ -3039,60 +3215,7 @@ function createBookmarkItem(item, query = '') {
   });
 
   el.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    showContextMenu(e.clientX, e.clientY, [
-      {
-        label: chrome.i18n.getMessage('ctxOpenNewTab'),
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/></svg>`,
-        action: () => chrome.tabs.create({ url: item.url })
-      },
-      {
-        label: chrome.i18n.getMessage('ctxCopyUrl'),
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/></svg>`,
-        action: () => {
-          navigator.clipboard.writeText(item.url).then(() => showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success'));
-        }
-      },
-      { separator: true },
-      {
-        label: chrome.i18n.getMessage('ctxEdit'),
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>`,
-        action: async () => {
-          const newTitle = prompt(chrome.i18n.getMessage('promptNewTitle'), item.title);
-          if (newTitle === null) return;
-          const newUrl = prompt(chrome.i18n.getMessage('promptNewUrl'), item.url);
-          if (newUrl === null) return;
-
-          try {
-            await chrome.bookmarks.update(item.id, { title: newTitle, url: newUrl });
-            showToast(chrome.i18n.getMessage('toastBookmarkUpdated'), 'success');
-            state.bookmarkTree = null;
-            loadBookmarks();
-          } catch (err) {
-            console.error('Failed to update bookmark', err);
-            showToast(chrome.i18n.getMessage('toastBookmarkUpdateFailed'), 'error');
-          }
-        }
-      },
-      {
-        label: chrome.i18n.getMessage('ctxDelete'),
-        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
-        danger: true,
-        action: async () => {
-          if (confirm(chrome.i18n.getMessage('confirmDeleteBookmark', [item.title || item.url]))) {
-            try {
-              await chrome.bookmarks.remove(item.id);
-              showToast(chrome.i18n.getMessage('toastBookmarkDeleted'), 'success');
-              state.bookmarkTree = null;
-              loadBookmarks();
-            } catch (err) {
-              console.error('Failed to remove bookmark', err);
-              showToast(chrome.i18n.getMessage('toastBookmarkDeleteFailed'), 'error');
-            }
-          }
-        }
-      }
-    ]);
+    handleBookmarkContextMenu(e, item);
   });
 
   return el;
