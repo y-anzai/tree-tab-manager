@@ -3057,7 +3057,7 @@ function renderHistory(items, query = '', recentSessions = []) {
 
       el.addEventListener('click', (e) => {
         if (e.target.closest('.history-remove')) return;
-        chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
+        chrome.tabs.create({ url: item.url, active: true });
         // 最近使用したブックマーク更新
         updateRecentlyUsed(item.url);
 
@@ -3197,7 +3197,7 @@ function createHistoryItemElement(item, query, isNested = false) {
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('.history-remove')) return;
-    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
+    chrome.tabs.create({ url: item.url, active: true });
     updateRecentlyUsed(item.url);
     if (state.userSettings.closeOnSelect) {
       window.close();
@@ -3319,7 +3319,7 @@ function createHistoryCloudItem(item, maxCount, minCount, query = '') {
   `;
 
   el.addEventListener('click', (e) => {
-    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
+    chrome.tabs.create({ url: item.url, active: true });
     updateRecentlyUsed(item.url);
     if (state.userSettings.closeOnSelect) {
       window.close();
@@ -3609,7 +3609,7 @@ function createCloudItem(item, maxCount, minCount) {
   el.style.background = `linear-gradient(135deg, color-mix(in srgb, var(--theme-color) ${Math.round(opacity * 100)}%, var(--bg-tertiary)), var(--bg-tertiary))`;
 
   const faviconUrl = getFaviconUrl(item.url);
-  const rawTitle = item.title || item.url;
+  const rawTitle = item.title === "" ? "" : (item.title || item.url);
   const displayTitle = rawTitle.length > 20 ? rawTitle.substring(0, 20) + '...' : rawTitle;
 
   el.innerHTML = `
@@ -3622,7 +3622,7 @@ function createCloudItem(item, maxCount, minCount) {
   `;
 
   el.addEventListener('click', (e) => {
-    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
+    chrome.tabs.create({ url: item.url, active: true });
     updateRecentlyUsed(item.url);
     if (state.userSettings.closeOnSelect) {
       window.close();
@@ -3704,19 +3704,9 @@ function createBookmarkItem(item, query = '') {
   const el = document.createElement('div');
   el.className = 'bookmark-item';
   const faviconUrl = getFaviconUrl(item.url);
-  const title = highlightText(item.title || item.url, query);
-  let dateStr = '';
-  if (state.bookmarkSortMode === 'most-visited') {
-    if (state.userSettings.bookmarkVisitCount) {
-      const count = state.visitCountMap[item.url] || 0;
-      dateStr = count > 0 ? chrome.i18n.getMessage('bookmarkCount', [count.toLocaleString()]) : '';
-    } else {
-      dateStr = '';
-    }
-  } else {
-    const usedTime = state.recentlyUsedBookmarks[item.url];
-    dateStr = usedTime ? formatTime(usedTime) : (item.dateAdded ? formatTime(item.dateAdded) : '');
-  }
+  const isTextHidden = item.title === "";
+  const titleText = isTextHidden ? "" : (item.title || item.url);
+  const title = highlightText(titleText, query);
 
   el.innerHTML = `
     ${faviconUrl
@@ -3725,7 +3715,7 @@ function createBookmarkItem(item, query = '') {
     }
     <div class="bookmark-info">
       <div class="bookmark-title">${title}</div>
-      ${(state.bookmarkSortMode !== 'tree' && item.pathObjects && item.pathObjects.length > 0) ? `
+      ${(!isTextHidden && state.bookmarkSortMode !== 'tree' && item.pathObjects && item.pathObjects.length > 0) ? `
         <div class="bookmark-path">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
@@ -3738,7 +3728,7 @@ function createBookmarkItem(item, query = '') {
           </div>
         </div>
       ` : ''}
-      <div class="bookmark-url">${escapeHtml(item.url)}</div>
+      ${!isTextHidden ? `<div class="bookmark-url">${escapeHtml(item.url)}</div>` : ''}
     </div>
     ${dateStr ? `<div class="bookmark-date">${escapeHtml(dateStr)}</div>` : ''}
   `;
@@ -3754,7 +3744,7 @@ function createBookmarkItem(item, query = '') {
       return;
     }
 
-    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
+    chrome.tabs.create({ url: item.url, active: true });
     updateRecentlyUsed(item.url);
 
     if (state.userSettings.closeOnSelect) {
