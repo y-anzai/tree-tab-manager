@@ -14,6 +14,8 @@ const state = {
   tabActivationTime: {},  // tabId -> lastActivationTime（最近開いた順用）
   lastSortMode: null,     // 前回のソートモードを記憶
   lastMovedTabIds: [],    // アニメーション用：最後に子になったタブ
+  tabSortMode: 'tree',    // 'tree' | 'cloud'
+  tabCloudSortMode: 'order', // 'order' | 'recent'
 
   tabGroupMap: {},        // tabId -> groupId（グループ認識用）
   tabGroupInfo: {},       // groupId -> { id, title, color, collapsed }
@@ -24,9 +26,13 @@ const state = {
   // 履歴パネル
   historyItems: [],
   historyQuery: '',
-  historySortMode: 'recent', // 'recent' | 'most-visited'
+  historySortMode: 'recent', // 'recent' | 'most-visited' | 'cloud'
+  historyCloudSortMode: 'most-visited', // 'recent' | 'most-visited'
 
-  // ブックマークパネル
+  bookmarkFolderState: {}, // folderId -> collapsed
+
+  // 保存された各種パネルの表示設定
+  activePanel: 'tabs',
   bookmarkTree: null,
   bookmarkSortMode: 'recent-used', // 'recent-used' | 'recent-added' | 'most-visited' | 'tree' | 'cloud'
   bookmarkCloudSortMode: 'most-visited', // 'recent-used' | 'recent-added' | 'most-visited'
@@ -560,6 +566,7 @@ function renderNavTabs() {
       if (panel) panel.classList.add('active');
 
       // アクティブなパネルを保存
+      state.activePanel = tab.id;
       chrome.storage.local.set({ 'ttm-active-panel': tab.id });
 
       if (tab.id === 'history') loadHistory();
@@ -579,6 +586,7 @@ function renderNavTabs() {
   chrome.storage.local.get(['ttm-active-panel'], (data) => {
     const savedPanel = data['ttm-active-panel'];
     const targetId = (savedPanel && visibleTabs.some(t => t.id === savedPanel)) ? savedPanel : (visibleTabs[0]?.id || 'tabs');
+    state.activePanel = targetId;
 
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -1353,8 +1361,20 @@ function getMatchingTabs(tabs, query) {
 // タブツリーを描画
 function renderTabTree() {
   const container = document.getElementById('tab-tree');
+  
   const matchIds = getMatchingTabs(state.tabs, state.tabQuery);
   const filteredTabs = matchIds ? state.tabs.filter(t => matchIds.has(t.id)) : state.tabs;
+
+  if (state.tabSortMode === 'cloud') {
+    renderTabCloud(container, filteredTabs);
+    return;
+  }
+
+  if (state.tabSortMode === 'recent') {
+    renderTabRecentList(container, filteredTabs);
+    return;
+  }
+
   let { roots, pinnedRoots } = buildTabTree(filteredTabs, state.tabParents);
 
   // 検索時、マッチした親タブを強制的に展開する
@@ -1492,6 +1512,169 @@ function renderTabNode(container, tab, depth) {
   }
 
   container.appendChild(nodeEl);
+}
+
+function renderTabRecentList(container, tabs) {
+  container.innerHTML = '';
+  
+  if (tabs.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyTabs')}</p></div>`;
+    return;
+  }
+
+  const sorted = [...tabs].sort((a,b) => (state.tabActivationTime[b.id] || 0) - (state.tabActivationTime[a.id] || 0));
+
+  sorted.forEach(tab => {
+    const nodeEl = document.createElement('div');
+    nodeEl.className = 'tab-node';
+    nodeEl.dataset.tabId = tab.id;
+    nodeEl.appendChild(createTabElement(tab, 0, false, false));
+    container.appendChild(nodeEl);
+  });
+}
+
+function renderTabCloud(container, tabs) {
+  container.innerHTML = '';
+  
+  if (tabs.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyTabs')}</p></div>`;
+    return;
+  }
+
+  // URLとタイトルでグループ化（同じサイトのタブをまとめる）
+  const aggregated = new Map();
+  tabs.forEach(tab => {
+    const normalizedUrl = (tab.url || '').split('#')[0];
+    const groupKey = `${tab.title || ''}||${normalizedUrl}`;
+    
+    if (aggregated.has(groupKey)) {
+      const existing = aggregated.get(groupKey);
+      existing.tabIds.push(tab.id);
+      existing.indices.push(tab.index);
+      existing.activationTimes.push(state.tabActivationTime[tab.id] || 0);
+    } else {
+      aggregated.set(groupKey, {
+        ...tab,
+        tabIds: [tab.id],
+        indices: [tab.index],
+        activationTimes: [state.tabActivationTime[tab.id] || 0]
+      });
+    }
+  });
+
+  const uniqueItems = Array.from(aggregated.values());
+
+  // 内部ツールバー
+  const toolbar = document.createElement('div');
+  toolbar.className = 'cloud-toolbar';
+  toolbar.innerHTML = `
+    <button class="cloud-sort-btn ${state.tabCloudSortMode === 'frequency' ? 'active' : ''}" data-sort="frequency">
+      ${chrome.i18n.getMessage('sortMostVisited')}
+    </button>
+    <button class="cloud-sort-btn ${state.tabCloudSortMode === 'recent' ? 'active' : ''}" data-sort="recent">
+       ${chrome.i18n.getMessage('sortRecentUsed')}
+    </button>
+    <button class="cloud-sort-btn ${state.tabCloudSortMode === 'order' ? 'active' : ''}" data-sort="order">
+      ${chrome.i18n.getMessage('tabOrder')}
+    </button>
+  `;
+  toolbar.querySelectorAll('.cloud-sort-btn').forEach(btn => {
+    btn.onclick = () => {
+      state.tabCloudSortMode = btn.dataset.sort;
+      renderTabTree(); // 再描画
+    };
+  });
+  container.appendChild(toolbar);
+
+  // ソート
+  if (state.tabCloudSortMode === 'order') {
+    uniqueItems.sort((a,b) => Math.min(...a.indices) - Math.min(...b.indices));
+  } else if (state.tabCloudSortMode === 'frequency') {
+    uniqueItems.sort((a,b) => {
+      const normalizedA = (a.url || '').split('#')[0];
+      const normalizedB = (b.url || '').split('#')[0];
+      return (state.visitCountMap[normalizedB] || 0) - (state.visitCountMap[normalizedA] || 0);
+    });
+  } else {
+    uniqueItems.sort((a,b) => Math.max(...b.activationTimes) - Math.max(...a.activationTimes));
+  }
+
+  const cloudContainer = document.createElement('div');
+  cloudContainer.className = 'bookmark-cloud'; // スタイル流用
+
+  // 重み付け（訪問回数）
+  const counts = uniqueItems.map(item => {
+    const normalizedUrl = (item.url || '').split('#')[0];
+    return state.visitCountMap[normalizedUrl] || 0;
+  });
+  const maxCount = Math.max(...counts, 1);
+  const minCount = Math.min(...counts);
+
+  uniqueItems.forEach(item => {
+    const el = createTabCloudItem(item, maxCount, minCount);
+    cloudContainer.appendChild(el);
+  });
+
+  container.appendChild(cloudContainer);
+}
+
+function createTabCloudItem(item, maxCount, minCount) {
+  const el = document.createElement('div');
+  el.className = 'cloud-item';
+  
+  const normalizedUrl = (item.url || '').split('#')[0];
+  const count = state.visitCountMap[normalizedUrl] || 0;
+  const weight = maxCount > 0 ? (Math.log(count + 1) / Math.log(maxCount + 1)) : 0.5;
+  
+  const fontSize = 10 + (weight * 8);
+  el.style.fontSize = `${fontSize}px`;
+  
+  if (weight > 0.6) {
+    el.style.fontWeight = '600';
+    el.classList.add('premium');
+  }
+  
+  const opacity = 0.05 + (weight * 0.15);
+  el.style.background = `linear-gradient(135deg, color-mix(in srgb, var(--theme-color) ${Math.round(opacity * 100)}%, var(--bg-tertiary)), var(--bg-tertiary))`;
+
+  const faviconUrl = getFaviconUrl(item.url);
+  const rawTitle = item.title || item.url;
+  const displayTitle = rawTitle.length > 20 ? rawTitle.substring(0, 20) + '...' : rawTitle;
+
+  el.innerHTML = `
+    ${faviconUrl 
+      ? `<img class="bookmark-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
+      : `<svg class="bookmark-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
+    }
+    <span class="cloud-title">${escapeHtml(displayTitle)}</span>
+    ${item.tabIds.length > 1 ? `<span class="cloud-count">${item.tabIds.length}</span>` : ''}
+  `;
+
+  el.addEventListener('click', (e) => {
+    // 最初のタブに切り替え
+    const tabId = item.tabIds[0];
+    chrome.tabs.update(tabId, { active: true });
+    if (state.userSettings.closeOnSelect) {
+      window.close();
+    }
+  });
+
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const menuItems = [
+      {
+        label: `${item.tabIds.length}個のタブを全て閉じる`,
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+        danger: true,
+        action: () => {
+          chrome.tabs.remove(item.tabIds);
+        }
+      }
+    ];
+    showContextMenu(e.clientX, e.clientY, menuItems);
+  });
+
+  return el;
 }
 
 function createTabElement(tab, depth, hasChildren = false, isCollapsed = false) {
@@ -2564,6 +2747,86 @@ document.getElementById('btn-sessions').addEventListener('click', async () => {
   setTimeout(() => input.focus(), 100);
 });
 
+// タブソート
+document.querySelectorAll('#panel-tabs .sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#panel-tabs .sort-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.tabSortMode = btn.dataset.sort;
+    renderTabTree();
+  });
+});
+
+// ===== キーボードショートカット =====
+window.addEventListener('keydown', (e) => {
+  // フォーカスが入力中の場合は無視（Escでフォーカス解除のみ対応）
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    if (e.key === 'Escape') {
+      document.activeElement.blur();
+    }
+    return;
+  }
+
+  // Ctrl/Cmd/Altが押されている場合はブラウザ標準機能を優先
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  const key = e.key.toLowerCase();
+  
+  // パネル切り替え
+  if (['t', 'h', 'f', 's', 'c'].includes(key)) {
+    const mapping = { 't': 'tabs', 'h': 'history', 'f': 'bookmarks', 's': 'settings', 'c': 'snippets' };
+    switchPanel(mapping[key]);
+  }
+  
+  // 検索フォーカス
+  if (key === '/') {
+    e.preventDefault();
+    const activePanelId = state.activePanel;
+    let searchId = `${activePanelId}-search`;
+    // ブックマークは特別（スペルの問題等あれば微調整）
+    if (activePanelId === 'bookmarks') searchId = 'bookmark-search';
+    
+    const searchInput = document.getElementById(searchId);
+    if (searchInput) {
+      searchInput.focus();
+      searchInput.select();
+    }
+  }
+
+  // モード切替
+  if (key === 'm') {
+    toggleNextSortMode();
+  }
+});
+
+function switchPanel(panelId) {
+  const btn = document.querySelector(`.tab-btn[data-panel="${panelId}"]`);
+  if (btn) btn.click();
+}
+
+function toggleNextSortMode() {
+  const panelId = state.activePanel;
+  const sortBtnIds = {
+    'tabs': ['tree', 'cloud', 'recent'],
+    'bookmarks': ['tree', 'recent-used', 'recent-added', 'cloud'],
+    'history': ['recent', 'unique', 'cloud']
+  };
+
+  const modes = sortBtnIds[panelId];
+  if (!modes) return;
+
+  let currentMode = '';
+  if (panelId === 'tabs') currentMode = state.tabSortMode;
+  if (panelId === 'bookmarks') currentMode = state.bookmarkSortMode;
+  if (panelId === 'history') currentMode = state.historySortMode;
+
+  const nextIdx = (modes.indexOf(currentMode) + 1) % modes.length;
+  const nextMode = modes[nextIdx];
+
+  const nextBtn = document.querySelector(`#panel-${panelId} .sort-btn[data-sort="${nextMode}"]`);
+  if (nextBtn) nextBtn.click();
+}
+
 document.getElementById('btn-confirm-save').addEventListener('click', async () => {
   const name = document.getElementById('session-name-input').value.trim();
   try {
@@ -2667,10 +2930,16 @@ async function loadHistory(query = '') {
 function renderHistory(items, query = '', recentSessions = []) {
   const container = document.getElementById('history-list');
 
-  // ソート適用
-  let sortedItems = [...items];
-  if (state.historySortMode === 'most-visited') {
-    sortedItems.sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0));
+  // クラウドモード判定
+  if (state.historySortMode === 'cloud') {
+    renderHistoryCloud(container, items, query);
+    return;
+  }
+
+  // スッキリモード（URL重複なし）
+  if (state.historySortMode === 'unique') {
+    renderHistoryUniqueList(container, items, query);
+    return;
   }
 
   if (items.length === 0) {
@@ -2754,6 +3023,7 @@ function renderHistory(items, query = '', recentSessions = []) {
       container.appendChild(sep);
     }
   }
+
   Object.entries(groups).forEach(([date, dateItems]) => {
     const groupEl = document.createElement('div');
     groupEl.className = 'history-group';
@@ -2808,6 +3078,284 @@ function renderHistory(items, query = '', recentSessions = []) {
 
     container.appendChild(groupEl);
   });
+}
+
+function renderHistoryUniqueList(container, items, query = '') {
+  container.innerHTML = '';
+  
+  if (items.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd"/></svg>
+      <p>${chrome.i18n.getMessage('emptyHistory')}</p>
+    </div>`;
+    return;
+  }
+
+  // 1. URLのみでグループ化（同じサイトの履歴を完全にまとめる）
+  const aggregated = new Map();
+  items.forEach(item => {
+    const normalizedUrl = (item.url || '').split('#')[0];
+    const groupKey = normalizedUrl;
+    if (aggregated.has(groupKey)) {
+      const existing = aggregated.get(groupKey);
+      existing.visitCount = Math.max(existing.visitCount || 0, item.visitCount || 0);
+      if (item.lastVisitTime > (existing.lastVisitTime || 0)) {
+        existing.lastVisitTime = item.lastVisitTime;
+        existing.title = item.title;
+      }
+    } else {
+      aggregated.set(groupKey, { ...item });
+    }
+  });
+
+  const uniqueItems = Array.from(aggregated.values())
+                      .sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
+
+  // 2. 連続する同一ドメインをグループ化
+  const groups = [];
+  uniqueItems.forEach(item => {
+    let domain = '';
+    try { domain = new URL(item.url).hostname; } catch(e) {}
+    
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup.domain === domain && domain !== '') {
+      lastGroup.items.push(item);
+    } else {
+      groups.push({ domain, items: [item] });
+    }
+  });
+
+  // 3. 描画
+  groups.forEach(group => {
+    if (group.items.length > 1) {
+      // ドメイングループを作成
+      const groupWrapper = document.createElement('div');
+      groupWrapper.className = 'history-domain-group-wrapper';
+      
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'history-item domain-header collapsed';
+      
+      const faviconUrl = getFaviconUrl(group.items[0].url);
+      
+      groupHeader.innerHTML = `
+        <div class="domain-toggle">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 6 8 10 12 6"></polyline></svg>
+        </div>
+        ${faviconUrl
+          ? `<img class="history-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
+          : `<svg class="history-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
+        }
+        <div class="history-info">
+          <div class="history-title">${escapeHtml(group.domain)}</div>
+          <div class="history-url">${group.items.length} ${chrome.i18n.getMessage('itemsText')}</div>
+        </div>
+        <div class="history-time">${formatTime(group.items[0].lastVisitTime)}</div>
+      `;
+
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'history-domain-children hidden';
+      
+      group.items.forEach(item => {
+        childrenContainer.appendChild(createHistoryItemElement(item, query, true));
+      });
+
+      groupHeader.addEventListener('click', () => {
+        const isCollapsed = groupHeader.classList.toggle('collapsed');
+        childrenContainer.classList.toggle('hidden', isCollapsed);
+      });
+
+      groupWrapper.appendChild(groupHeader);
+      groupWrapper.appendChild(childrenContainer);
+      container.appendChild(groupWrapper);
+    } else {
+      container.appendChild(createHistoryItemElement(group.items[0], query));
+    }
+  });
+}
+
+function createHistoryItemElement(item, query, isNested = false) {
+  const el = document.createElement('div');
+  el.className = `history-item ${isNested ? 'nested' : ''}`;
+  const faviconUrl = getFaviconUrl(item.url);
+  const title = highlightText(item.title || item.url, query);
+  const url = highlightText(item.url, query);
+
+  el.innerHTML = `
+    ${faviconUrl
+      ? `<img class="history-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
+      : `<svg class="history-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
+    }
+    <div class="history-info">
+      <div class="history-title">${title}</div>
+      <div class="history-url">${url}</div>
+    </div>
+    <div class="history-time">${formatTime(item.lastVisitTime)}</div>
+    <button class="history-remove" title="${chrome.i18n.getMessage('ctxDelete')}">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+    </button>
+  `;
+
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('.history-remove')) return;
+    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
+    updateRecentlyUsed(item.url);
+    if (state.userSettings.closeOnSelect) {
+      window.close();
+    }
+  });
+
+  el.querySelector('.history-remove').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await chrome.history.deleteUrl({ url: item.url });
+    el.remove();
+    showToast(chrome.i18n.getMessage('toastHistoryDeleted'));
+  });
+
+  return el;
+}
+
+function renderHistoryCloud(container, items, query = '') {
+  container.innerHTML = '';
+  
+  if (items.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd"/></svg>
+      <p>${chrome.i18n.getMessage('emptyHistory')}</p>
+    </div>`;
+    return;
+  }
+
+  // URLのみでグループ化（同じサイトの履歴を完全にまとめる）
+  const aggregated = new Map();
+  items.forEach(item => {
+    // URLのフラグメント（#以降）を無視して正規化
+    const normalizedUrl = (item.url || '').split('#')[0];
+    const groupKey = normalizedUrl;
+
+    if (aggregated.has(groupKey)) {
+      const existing = aggregated.get(groupKey);
+      existing.visitCount = Math.max(existing.visitCount || 0, item.visitCount || 0);
+      if (item.lastVisitTime > (existing.lastVisitTime || 0)) {
+        existing.lastVisitTime = item.lastVisitTime;
+        existing.title = item.title;
+      }
+    } else {
+      aggregated.set(groupKey, { ...item });
+    }
+  });
+
+  const uniqueItems = Array.from(aggregated.values());
+
+  // 内部ツールバー
+  const toolbar = document.createElement('div');
+  toolbar.className = 'cloud-toolbar';
+  toolbar.innerHTML = `
+    <button class="cloud-sort-btn ${state.historyCloudSortMode === 'most-visited' ? 'active' : ''}" data-sort="most-visited">
+      ${chrome.i18n.getMessage('sortMostVisited')}
+    </button>
+    <button class="cloud-sort-btn ${state.historyCloudSortMode === 'recent' ? 'active' : ''}" data-sort="recent">
+      ${chrome.i18n.getMessage('sortRecentUsed')}
+    </button>
+  `;
+  toolbar.querySelectorAll('.cloud-sort-btn').forEach(btn => {
+    btn.onclick = () => {
+      state.historyCloudSortMode = btn.dataset.sort;
+      renderHistoryCloud(container, items, query);
+    };
+  });
+  container.appendChild(toolbar);
+
+  // ソート
+  if (state.historyCloudSortMode === 'most-visited') {
+    uniqueItems.sort((a,b) => (b.visitCount || 0) - (a.visitCount || 0));
+  } else {
+    uniqueItems.sort((a,b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
+  }
+
+  const cloudContainer = document.createElement('div');
+  cloudContainer.className = 'bookmark-cloud'; // スタイル流用
+
+  const counts = uniqueItems.map(item => item.visitCount || 0);
+  const maxCount = Math.max(...counts, 1);
+  const minCount = Math.min(...counts);
+
+  uniqueItems.forEach(item => {
+    const el = createHistoryCloudItem(item, maxCount, minCount, query);
+    cloudContainer.appendChild(el);
+  });
+
+  container.appendChild(cloudContainer);
+}
+
+function createHistoryCloudItem(item, maxCount, minCount, query = '') {
+  const el = document.createElement('div');
+  el.className = 'cloud-item';
+  
+  const count = item.visitCount || 0;
+  const weight = maxCount > 0 ? (Math.log(count + 1) / Math.log(maxCount + 1)) : 0.5;
+  
+  const fontSize = 10 + (weight * 8);
+  el.style.fontSize = `${fontSize}px`;
+  
+  if (weight > 0.6) {
+    el.style.fontWeight = '600';
+    el.classList.add('premium');
+  }
+  
+  const opacity = 0.05 + (weight * 0.15);
+  el.style.background = `linear-gradient(135deg, color-mix(in srgb, var(--theme-color) ${Math.round(opacity * 100)}%, var(--bg-tertiary)), var(--bg-tertiary))`;
+
+  const faviconUrl = getFaviconUrl(item.url);
+  const rawTitle = item.title || item.url;
+  const displayTitle = rawTitle.length > 20 ? rawTitle.substring(0, 20) + '...' : rawTitle;
+
+  el.innerHTML = `
+    ${faviconUrl 
+      ? `<img class="bookmark-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
+      : `<svg class="bookmark-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
+    }
+    <span class="cloud-title">${escapeHtml(displayTitle)}</span>
+    ${count > 0 ? `<span class="cloud-count">${count}</span>` : ''}
+  `;
+
+  el.addEventListener('click', (e) => {
+    chrome.tabs.create({ url: item.url, active: !!state.userSettings.closeOnSelect });
+    updateRecentlyUsed(item.url);
+    if (state.userSettings.closeOnSelect) {
+      window.close();
+    }
+  });
+
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showContextMenu(e.clientX, e.clientY, [
+      {
+        label: chrome.i18n.getMessage('ctxOpenNewTab'),
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/></svg>`,
+        action: () => chrome.tabs.create({ url: item.url })
+      },
+      {
+        label: chrome.i18n.getMessage('ctxCopyUrl'),
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z"/></svg>`,
+        action: () => {
+          navigator.clipboard.writeText(item.url).then(() => showToast(chrome.i18n.getMessage('toastUrlCopied'), 'success'));
+        }
+      },
+      { separator: true },
+      {
+        label: chrome.i18n.getMessage('ctxDelete'),
+        icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
+        danger: true,
+        action: async () => {
+             await chrome.history.deleteUrl({ url: item.url });
+             el.remove();
+             showToast(chrome.i18n.getMessage('toastHistoryDeleted'));
+        }
+      }
+    ]);
+  });
+
+  return el;
 }
 
 function highlightText(text, query) {

@@ -80,6 +80,9 @@
   "sortCloud": {
     "message": "クラウド"
   },
+  "sortUnique": {
+    "message": "スッキリ"
+  },
   "sortRecentTooltip": {
     "message": "並び順: 最近開いた順（クリックでツリー順に戻す）"
   },

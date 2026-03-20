@@ -116,6 +116,14 @@
         class="search-input">
     </div>
 
+    <div class="sort-bar">
+      <div class="sort-buttons">
+        <button class="sort-btn active" data-sort="tree" data-i18n="sortTree">ツリー</button>
+        <button class="sort-btn" data-sort="cloud" data-i18n="sortCloud">クラウド</button>
+        <button class="sort-btn" data-sort="recent" data-i18n="sortRecentUsed">最近利用</button>
+      </div>
+    </div>
+
     <!-- タブツリー表示エリア -->
     <div class="tree-container" id="tab-tree">
       <div class="loading" data-i18n="msgLoading">読み込み中...</div>
@@ -139,6 +147,14 @@
             clip-rule="evenodd" />
         </svg>
       </button>
+    </div>
+    <div class="sort-bar">
+      <span class="sort-label" data-i18n="sortLabel">並び順:</span>
+      <div class="sort-buttons">
+        <button class="sort-btn active" data-sort="recent" data-i18n="sortRecent">最近利用</button>
+        <button class="sort-btn" data-sort="unique" data-i18n="sortUnique">スッキリ</button>
+        <button class="sort-btn" data-sort="cloud" data-i18n="sortCloud">クラウド</button>
+      </div>
     </div>
     <div class="list-container" id="history-list">
       <div class="loading" data-i18n="msgLoading">読み込み中...</div>
@@ -221,7 +237,33 @@
       <hr class="settings-divider">
       <h3 class="settings-subtitle" data-i18n="settingsOtherTitle">その他の設定</h3>
 
-      <div class="settings-list" id="other-settings-list">
+      <hr class="settings-divider">
+      <h3 class="settings-subtitle" data-i18n="settingsShortcutsTitle">キーボードショートカット (デフォルト)</h3>
+      <div class="settings-list shortcuts-list">
+        <div class="shortcut-item">
+          <span class="shortcut-key">T</span> <span class="shortcut-desc">タブパネル</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">H</span> <span class="shortcut-desc">履歴パネル</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">F</span> <span class="shortcut-desc">お気に入り</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">C</span> <span class="shortcut-desc">スニペット</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">S</span> <span class="shortcut-desc">設定</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">/</span> <span class="shortcut-desc">検索をフォーカス</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="shortcut-key">M</span> <span class="shortcut-desc">表示モード切替</span>
+        </div>
+      </div>
+
+      <div class="settings-list" id="other-settings-list" style="margin-top: 20px;">
         <div class="settings-item-normal" style="flex-direction: column; align-items: flex-start; gap: 10px;">
           <div class="settings-item-label" data-i18n="settingsThemeColor">テーマカラー</div>
           <div class="theme-color-swatches" id="theme-color-swatches">

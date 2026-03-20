@@ -80,6 +80,9 @@
     "sortCloud": {
         "message": "Cloud"
     },
+    "sortUnique": {
+        "message": "Clean"
+    },
     "sortRecentTooltip": {
         "message": "Sort: Recent (Click for Tree)"
     },
