@@ -77,6 +77,12 @@
     "sortTreeTooltip": {
         "message": "Sort: Tree (Click for Recent)"
     },
+    "sortCloud": {
+        "message": "Cloud"
+    },
+    "sortUnique": {
+        "message": "Clean"
+    },
     "sortRecentTooltip": {
         "message": "Sort: Recent (Click for Tree)"
     },

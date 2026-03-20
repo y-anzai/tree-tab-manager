@@ -1020,6 +1020,51 @@ body[data-toggle-size="large"] .tab-toggle svg {
   height: 12px;
 }
 
+/* 履歴のスッキリモード：ドメイングループ */
+.history-domain-group-wrapper {
+  margin-bottom: 2px;
+}
+
+.domain-header {
+  font-weight: 600 !important;
+  background: color-mix(in srgb, var(--bg-secondary), transparent 40%) !important;
+}
+
+.domain-header.collapsed svg {
+  transform: none;
+}
+
+.domain-header:not(.collapsed) .domain-toggle svg {
+  transform: rotate(90deg);
+}
+
+.domain-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.history-domain-children {
+  margin-left: 20px;
+  border-left: 1px solid var(--border);
+  padding-left: 0px;
+  overflow: hidden;
+}
+
+.history-item.nested {
+  margin-left: 0;
+  border-radius: 0 4px 4px 0;
+  padding-left: 8px;
+}
+
+.hidden {
+  display: none !important;
+}
+
 /* ===== ソートバー ===== */
 .sort-bar {
   display: flex;
@@ -1146,6 +1191,104 @@ body[data-toggle-size="large"] .tab-toggle svg {
 
 .bookmark-item:hover {
   background: var(--bg-hover);
+}
+
+/* ===== ブックマーククラウド ===== */
+.cloud-toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
+}
+
+.cloud-sort-btn {
+  padding: 3px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.cloud-sort-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.cloud-sort-btn.active {
+  background: var(--bg-active);
+  color: var(--theme-color);
+  border-color: var(--theme-color);
+  font-weight: 600;
+}
+
+.bookmark-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px; /* 8px -> 4px */
+  padding: 8px; /* 12px -> 8px */
+  align-content: flex-start;
+  justify-content: center; /* 中央寄せで密度感を出す */
+}
+
+.cloud-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px; /* 6px -> 4px */
+  padding: 4px 8px; /* 6px 12px -> 4px 8px */
+  background: var(--bg-tertiary); /* 通常は控えめな背景 */
+  border: none;
+  border-radius: 12px; /* 20px -> 12px (more compact) */
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: all var(--transition);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 100%;
+  box-shadow: 0 1px 2px var(--shadow); /* 高級感のための微細な影 */
+}
+
+.cloud-item:hover {
+  background: var(--bg-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 10;
+}
+
+.cloud-item.premium {
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--theme-color) 15%, transparent);
+}
+
+.cloud-item .bookmark-favicon {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.cloud-item .cloud-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cloud-item .cloud-count {
+  font-size: 0.7em;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.15);
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-left: 2px;
+  opacity: 0.8;
+  font-weight: normal;
+}
+
+.cloud-item:hover .cloud-count {
+  opacity: 1;
+  color: var(--theme-color);
 }
 
 .bookmark-favicon {
@@ -1467,8 +1610,42 @@ body[data-toggle-size="large"] .tab-toggle svg {
   display: none;
 }
 
+.shortcuts-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.shortcut-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 0 4px;
+  height: 20px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 0 var(--border);
+}
+
+.shortcut-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .modal-content {
-  background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   width: 90%;
