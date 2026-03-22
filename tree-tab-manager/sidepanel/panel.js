@@ -92,15 +92,7 @@ const state = {
   isFirstLoad: true
 };
 
-// ショートカット定義
-const SHORTCUT_ACTIONS = [
-  { id: 'switch-tabs', label: chrome.i18n.getMessage('actionSwitchTabs') },
-  { id: 'switch-history', label: chrome.i18n.getMessage('actionSwitchHistory') },
-  { id: 'switch-bookmarks', label: chrome.i18n.getMessage('actionSwitchBookmarks') },
-  { id: 'switch-settings', label: chrome.i18n.getMessage('actionSwitchSettings') },
-  { id: 'focus-search', label: chrome.i18n.getMessage('actionFocusSearch') },
-  { id: 'display-mode', label: chrome.i18n.getMessage('actionDisplayMode') },
-];
+
 
 // デフォルトのタブ設定
 const DEFAULT_TAB_CONFIG = [
@@ -858,135 +850,8 @@ function renderSettingsPanel() {
     };
   }
 
-  renderShortcutsSettings();
 }
 
-function renderShortcutsSettings() {
-  const container = document.getElementById('shortcuts-settings-list');
-  if (!container) return;
-  container.innerHTML = '';
-
-  // 内部ショートカットを先に描画（同期）
-  renderInternalShortcuts(container);
-
-  // 拡張機能自体の有効化やその他のグローバルショートカットを取得して先頭に挿入（非同期）
-  chrome.commands.getAll((commands) => {
-    // 逆順で先頭に追加（manifestの順序を維持気味に）
-    commands.slice().reverse().forEach(cmd => {
-      const globalItem = document.createElement('div');
-      globalItem.className = 'settings-item-normal';
-      globalItem.style.borderLeft = '4px solid var(--theme-color)';
-
-      let label = cmd.description;
-      if (!label && cmd.name === '_execute_action') label = chrome.i18n.getMessage('actionEnableExtension');
-
-      globalItem.innerHTML = `
-        <div class="settings-item-label">
-          <div style="display: flex; flex-direction: column;">
-            <span>${label || cmd.name}</span>
-            <span style="font-size: 10px; color: var(--text-muted); decoration: underline;">(Global Shortcut)</span>
-          </div>
-        </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <span class="shortcut-kbd-btn global-shortcut-btn">${cmd.shortcut || '---'}</span>
-          <button class="toolbar-btn primary" icon-only title="${chrome.i18n.getMessage('actionChangeShortcut')}">
-            <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
-          </button>
-        </div>
-      `;
-      globalItem.querySelector('button').onclick = () => {
-        chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
-      };
-      container.insertBefore(globalItem, container.firstChild);
-    });
-  });
-}
-
-function renderInternalShortcuts(container) {
-  SHORTCUT_ACTIONS.forEach(action => {
-    const item = document.createElement('div');
-    item.className = 'settings-item-normal';
-
-    const label = document.createElement('div');
-    label.className = 'settings-item-label';
-    label.textContent = action.label;
-
-    const right = document.createElement('div');
-    right.style.display = 'flex';
-    right.style.gap = '8px';
-    right.style.alignItems = 'center';
-
-    const kbd = document.createElement('button');
-    kbd.className = 'shortcut-kbd-btn';
-    kbd.textContent = state.userSettings.shortcuts[action.id] || '---';
-
-    kbd.onclick = () => {
-      if (state.isRecordingShortcut) return;
-      state.isRecordingShortcut = true;
-      kbd.classList.add('recording');
-      kbd.textContent = chrome.i18n.getMessage('shortcutRecordPrompt');
-
-      const onKeyDown = (e) => {
-        // Alt, Ctrl, Shift, Meta 自体は無視して継続
-        if (['Alt', 'Control', 'Shift', 'Meta'].includes(e.key)) {
-          return;
-        }
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Escapeでキャンセル
-        if (e.key === 'Escape') {
-          stopRecording();
-          return;
-        }
-
-        const shortcut = getShortcutString(e);
-        if (shortcut) {
-          state.userSettings.shortcuts[action.id] = shortcut;
-          saveUserSettings();
-          stopRecording();
-        }
-      };
-
-      const stopRecording = () => {
-        state.isRecordingShortcut = false;
-        kbd.classList.remove('recording');
-        kbd.textContent = state.userSettings.shortcuts[action.id] || '---';
-        window.removeEventListener('keydown', onKeyDown, true);
-        renderShortcutsSettings();
-      };
-
-      window.addEventListener('keydown', onKeyDown, true);
-    };
-
-    const resetBtn = document.createElement('button');
-    resetBtn.className = 'toolbar-btn';
-    resetBtn.title = chrome.i18n.getMessage('shortcutReset');
-    resetBtn.style.padding = '4px';
-    resetBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>`;
-    resetBtn.onclick = () => {
-      // デフォルトに戻す
-      const defaults = {
-        'switch-tabs': '',
-        'switch-history': '',
-        'switch-bookmarks': '',
-        'switch-settings': '',
-        'focus-search': '',
-        'display-mode': ''
-      };
-      state.userSettings.shortcuts[action.id] = defaults[action.id] || '';
-      saveUserSettings();
-      renderShortcutsSettings();
-    };
-
-    right.appendChild(kbd);
-    right.appendChild(resetBtn);
-    item.appendChild(label);
-    item.appendChild(right);
-    container.appendChild(item);
-  });
-}
 
 // ===== モーダル管理 =====
 function openModal(id) {
