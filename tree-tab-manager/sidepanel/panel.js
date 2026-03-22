@@ -570,8 +570,14 @@ function renderNavTabs() {
       state.activePanel = tab.id;
       chrome.storage.local.set({ 'ttm-active-panel': tab.id });
 
-      if (tab.id === 'history') loadHistory();
-      if (tab.id === 'bookmarks') loadBookmarks();
+      if (tab.id === 'history') {
+        loadHistory();
+        historyDirty = false;
+      }
+      if (tab.id === 'bookmarks') {
+        loadBookmarks(bookmarksDirty);
+        bookmarksDirty = false;
+      }
       if (tab.id === 'snippets') loadSnippets();
       if (tab.id === 'readingList') loadReadingList();
       // タブパネルに切り替えたとき、ダーティなら再同期
@@ -2913,27 +2919,33 @@ async function loadSessionList() {
 // ===== 履歴パネル =====
 let historySearchTimeout = null;
 
-async function loadHistory(query = '') {
+async function loadHistory(query) {
   const container = document.getElementById('history-list');
-  container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
+  const currentQuery = query !== undefined ? query : (document.getElementById('history-search')?.value.trim() || '');
+  state.historyQuery = currentQuery;
+
+  // 既にアイテムがある場合はローディングを表示せずチラツキを抑える
+  if (!currentQuery && state.historyItems.length === 0) {
+    container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
+  }
 
   try {
     let recentSessions = [];
-    if (state.userSettings.historyRecentlyClosed && !query) {
+    if (state.userSettings.historyRecentlyClosed && !currentQuery) {
       recentSessions = await new Promise((resolve) => {
         chrome.sessions.getRecentlyClosed({ maxResults: 10 }, (sessions) => resolve(sessions || []));
       });
     }
 
     const resp = await sendMessage('GET_HISTORY', {
-      query,
+      query: currentQuery,
       maxResults: 200,
       startTime: Date.now() - 30 * 24 * 60 * 60 * 1000
     });
 
     const items = resp?.history || [];
     state.historyItems = items;
-    renderHistory(items, query, recentSessions);
+    renderHistory(items, currentQuery, recentSessions);
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyHistoryLoadFail')}</p></div>`;
   }
@@ -3404,17 +3416,21 @@ document.querySelectorAll('#panel-history .sort-btn').forEach(btn => {
 // ===== ブックマークパネル =====
 let bookmarkSearchTimeout = null;
 
-async function loadBookmarks() {
+async function loadBookmarks(force = false) {
   if (state.isBookmarkLoading) return;
   const container = document.getElementById('bookmark-list');
   
-  if (state.bookmarkTree && state.bookmarkFlatList.length > 0) {
+  // キャッシュがあり、かつ強制リロード（バックグラウンド更新時など）でなければ描画のみ
+  if (!force && state.bookmarkTree && state.bookmarkFlatList.length > 0) {
     renderBookmarks();
     return;
   }
 
   state.isBookmarkLoading = true;
-  container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
+  // 初回のみローディング表示（バックグラウンド更新による再読込時は表示しない）
+  if (!state.bookmarkTree) {
+    container.innerHTML = `<div class="loading" data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</div>`;
+  }
 
   try {
     // 1. バックグラウンドからキャッシュを取得試行
@@ -4043,7 +4059,9 @@ if (chrome.readingList) {
 }
 
 // ===== バックグラウンドからのメッセージ受信 =====
-let tabsDirty = false; // タブパネルが非表示のときに更新があったフラグ
+let tabsDirty = false;
+let historyDirty = false;
+let bookmarksDirty = false;
 
 chrome.runtime.onMessage.addListener((message) => {
   switch (message.type) {
@@ -4074,6 +4092,23 @@ chrome.runtime.onMessage.addListener((message) => {
             el.classList.toggle('active-tab', Number(el.dataset.tabId) === message.tabId);
           });
         }
+      }
+      // ヒストリーやブックマークパネルに表示されているタブもアクティブ表示を更新（必要であれば）
+      break;
+
+    case 'HISTORY_UPDATED':
+      if (document.getElementById('panel-history').classList.contains('active')) {
+        loadHistory();
+      } else {
+        historyDirty = true;
+      }
+      break;
+
+    case 'BOOKMARKS_UPDATED':
+      if (document.getElementById('panel-bookmarks').classList.contains('active')) {
+        loadBookmarks(true); // force reload from background cache
+      } else {
+        bookmarksDirty = true;
       }
       break;
 

@@ -35,6 +35,7 @@ async function updateBookmarksCache() {
 
     bookmarksFlatListCache = flattenBookmarks(tree);
     console.log('[TTM] Bookmarks cache updated.');
+    notifyPanels({ type: 'BOOKMARKS_UPDATED' });
   } catch (e) {
     console.error('[TTM] Failed to update bookmarks cache', e);
   }
@@ -58,8 +59,14 @@ chrome.bookmarks.onCreated.addListener(updateBookmarksCache);
 chrome.bookmarks.onRemoved.addListener(updateBookmarksCache);
 chrome.bookmarks.onChanged.addListener(updateBookmarksCache);
 chrome.bookmarks.onMoved.addListener(updateBookmarksCache);
-chrome.history.onVisited.addListener(updateBookmarksCache);
-chrome.history.onVisitRemoved.addListener(updateBookmarksCache);
+chrome.history.onVisited.addListener((result) => {
+  updateBookmarksCache();
+  notifyPanels({ type: 'HISTORY_UPDATED', visit: result });
+});
+chrome.history.onVisitRemoved.addListener(() => {
+  updateBookmarksCache();
+  notifyPanels({ type: 'HISTORY_UPDATED' });
+});
 
 // Google Tasks キャッシュ (url -> listName)
 let googleTasksCache = new Map();
