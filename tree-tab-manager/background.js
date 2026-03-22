@@ -35,7 +35,6 @@ async function updateBookmarksCache() {
 
     bookmarksFlatListCache = flattenBookmarks(tree);
     console.log('[TTM] Bookmarks cache updated.');
-    notifyPanels({ type: 'BOOKMARKS_HISTORY_UPDATED' });
   } catch (e) {
     console.error('[TTM] Failed to update bookmarks cache', e);
   }
