@@ -612,21 +612,6 @@
   "actionExpandAll": {
     "message": "すべて展開"
   },
-  "actionFocusSearch": {
-    "message": "検索にフォーカス"
-  },
-  "actionSwitchTabs": {
-    "message": "「タブ」パネルへ"
-  },
-  "actionSwitchHistory": {
-    "message": "「履歴」パネルへ"
-  },
-  "actionSwitchBookmarks": {
-    "message": "「お気に入り」パネルへ"
-  },
-  "actionSwitchSettings": {
-    "message": "「設定」パネルへ"
-  },
   "toolbarCloseOnSelect": {
     "message": "選択後にパネルを自動で閉じる (ON/OFF)"
   },
@@ -739,5 +724,11 @@
   },
   "snippetSearchPlaceholder": {
     "message": "スニペット（スクラップ）を検索..."
+  },
+  "msgNoSelection": {
+    "message": "テキストを選択してから実行してください。"
+  },
+  "tabSearchPlaceholder": {
+    "message": "タブを検索..."
   }
 }

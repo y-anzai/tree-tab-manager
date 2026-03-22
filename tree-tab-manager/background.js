@@ -9,11 +9,72 @@ const tabMetadata = new Map();
 const STORAGE_KEY_PARENTS = 'ttm-tab-parents';
 const STORAGE_KEY_METADATA = 'ttm-tab-metadata';
 
+// ブックマーク・歴史メタデータ キャッシュ (UX・描画安定性向上のため)
+let bookmarksCache = null;
+let bookmarksFlatListCache = null;
+let recentlyUsedBookmarksCache = {};
+let visitCountMapCache = {};
+
+async function updateBookmarksCache() {
+  try {
+    const [tree, recentHistory] = await Promise.all([
+      chrome.bookmarks.getTree(),
+      chrome.history.search({ text: '', maxResults: 1000, startTime: Date.now() - 90 * 24 * 60 * 60 * 1000 })
+    ]);
+
+    bookmarksCache = tree;
+    recentlyUsedBookmarksCache = {};
+    visitCountMapCache = {};
+
+    recentHistory.forEach(item => {
+      if (!recentlyUsedBookmarksCache[item.url] || recentlyUsedBookmarksCache[item.url] < item.lastVisitTime) {
+        recentlyUsedBookmarksCache[item.url] = item.lastVisitTime;
+      }
+      visitCountMapCache[item.url] = item.visitCount || 0;
+    });
+
+    bookmarksFlatListCache = flattenBookmarks(tree);
+    console.log('[TTM] Bookmarks cache updated.');
+    notifyPanels({ type: 'BOOKMARKS_UPDATED' });
+  } catch (e) {
+    console.error('[TTM] Failed to update bookmarks cache', e);
+  }
+}
+
+function flattenBookmarks(nodes, pathObjects = []) {
+  const result = [];
+  nodes.forEach(node => {
+    if (node.url) {
+      result.push({ ...node, pathObjects });
+    } else if (node.children) {
+      const newPath = [...pathObjects, { id: node.id, title: node.title }];
+      result.push(...flattenBookmarks(node.children, newPath));
+    }
+  });
+  return result;
+}
+
+// 変更監視
+chrome.bookmarks.onCreated.addListener(updateBookmarksCache);
+chrome.bookmarks.onRemoved.addListener(updateBookmarksCache);
+chrome.bookmarks.onChanged.addListener(updateBookmarksCache);
+chrome.bookmarks.onMoved.addListener(updateBookmarksCache);
+chrome.history.onVisited.addListener((result) => {
+  updateBookmarksCache();
+  notifyPanels({ type: 'HISTORY_UPDATED', visit: result });
+});
+chrome.history.onVisitRemoved.addListener(() => {
+  updateBookmarksCache();
+  notifyPanels({ type: 'HISTORY_UPDATED' });
+});
+
 // Google Tasks キャッシュ (url -> listName)
 let googleTasksCache = new Map();
 
 // 起動時にデータをロード
 async function loadTreeData() {
+  // キャッシュを先行して構築（非同期）
+  updateBookmarksCache();
   const data = await chrome.storage.local.get([STORAGE_KEY_PARENTS, STORAGE_KEY_METADATA, 'ttm-last-tab-state', 'ttm-google-tasks-cache']);
   const savedParents = data[STORAGE_KEY_PARENTS] || {};
   const savedMetadata = data[STORAGE_KEY_METADATA] || {};
@@ -180,28 +241,47 @@ chrome.runtime.onInstalled.addListener(async () => {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => { });
   }
 
-  // 右クリックコンテキストメニュー (スニペット追加)
-  chrome.contextMenus.create({
-    id: 'add-to-snippets',
-    title: chrome.i18n.getMessage('ctxAddSnippet'),
-    contexts: ['selection']
-  });
+  setupContextMenus();
 });
+
+// コンテキストメニュー作成を関数化して再呼び出し可能に
+function setupContextMenus() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'add-to-snippets',
+      title: chrome.i18n.getMessage('ctxAddSnippet'),
+      contexts: ['selection']
+    });
+  });
+}
+
+// サービスワーカー起動時にも設定（安定性のため）
+setupContextMenus();
 
 // コンテキストメニュークリック
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'add-to-snippets') {
     try {
-      await chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_SNIPPET' });
+      // 1. まずメッセージを送ってみる
+      await chrome.tabs.sendMessage(tab.id, { 
+        type: 'CAPTURE_SNIPPET',
+        selectionText: info.selectionText 
+      });
     } catch (e) {
-      // スクリプトが注入されていない場合は手動で注入して再試行
+      console.log('[TTM] Content script not ready, injecting...');
+      // 2. 失敗（未注入）なら注入して再試行
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           files: ['content/snippets.js']
         });
-        // 注入完了後に再度メッセージ送る
-        chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_SNIPPET' });
+        // 3. 注入完了直後だとリスナーの準備に極短時間かかる場合があるため、少し待ってから送信
+        setTimeout(() => {
+          chrome.tabs.sendMessage(tab.id, { 
+            type: 'CAPTURE_SNIPPET',
+            selectionText: info.selectionText 
+          }).catch(err => console.error('[TTM] Retry sendMessage failed:', err));
+        }, 100);
       } catch (err) {
         console.error("[TTM] Failed to inject snippets script:", err);
       }
@@ -359,6 +439,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case 'GET_TAB_PARENTS':
       sendResponse({ parents: Object.fromEntries(tabParentMap) });
+      break;
+
+    case 'GET_BOOKMARKS_CACHE':
+      sendResponse({
+        tree: bookmarksCache,
+        flatList: bookmarksFlatListCache,
+        recentlyUsed: recentlyUsedBookmarksCache,
+        visitCounts: visitCountMapCache
+      });
       break;
 
     case 'SET_TAB_PARENT':

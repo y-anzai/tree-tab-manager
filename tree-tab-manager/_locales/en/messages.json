@@ -736,5 +736,8 @@
     },
     "snippetSearchPlaceholder": {
         "message": "Search scraps..."
+    },
+    "tabSearchPlaceholder": {
+        "message": "Search tabs..."
     }
 }
