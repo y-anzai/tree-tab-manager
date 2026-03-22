@@ -267,32 +267,12 @@ document.getElementById('btn-display-mode').addEventListener('click', () => {
   if (sel) sel.value = next;
 });
 
-// ===== タブ並び順モード管理 =====
-// 'tree'（ツリー表示）| 'recent'（最近開いた順フラット表示）
-
-function applySortMode(mode) {
-  state.tabSortMode = mode;
-  try { localStorage.setItem('ttm-tabSortMode', mode); } catch { }
-  const btn = document.getElementById('btn-sort-mode');
-  if (!btn) return;
-  btn.classList.toggle('sort-mode-active', mode === 'recent');
-  btn.title = mode === 'recent'
-    ? chrome.i18n.getMessage('sortRecentTooltip')
-    : chrome.i18n.getMessage('sortTreeTooltip');
-  // background.jsが読み込めるように同期
-  chrome.storage.local.set({ 'ttm-tab-sort-mode': mode });
-}
-
-// 保存された並び順を復元（なければ 'tree'）
-state.tabSortMode = (() => {
-  try { return localStorage.getItem('ttm-tabSortMode') || 'tree'; } catch { return 'tree'; }
-})();
-applySortMode(state.tabSortMode);
-chrome.storage.local.set({ 'ttm-tab-sort-mode': state.tabSortMode });
-
-document.getElementById('btn-sort-mode').addEventListener('click', () => {
+// 並び順切り替え（ツールバーの簡易ボタン用）
+document.getElementById('btn-sort-mode')?.addEventListener('click', () => {
   const next = state.tabSortMode === 'tree' ? 'recent' : 'tree';
-  applySortMode(next);
+  state.tabSortMode = next;
+  saveUserSettings(); 
+  restoreSortButtonsUI(); // 分割ボタンの状態も更新
   renderTabTree();
 });
 
@@ -458,16 +438,59 @@ async function loadUserSettings() {
     if (data['ttm-displayMode']) {
       state.displayMode = data['ttm-displayMode'];
     }
+
+    // ソートモード等の復元
+    const stateData = await chrome.storage.local.get(['ttm-tab-sort-mode', 'ttm-history-sort-mode', 'ttm-bookmark-sort-mode']);
+    if (stateData['ttm-tab-sort-mode']) state.tabSortMode = stateData['ttm-tab-sort-mode'];
+    if (stateData['ttm-history-sort-mode']) state.historySortMode = stateData['ttm-history-sort-mode'];
+    if (stateData['ttm-bookmark-sort-mode']) state.bookmarkSortMode = stateData['ttm-bookmark-sort-mode'];
+
     const pinnedData = await chrome.storage.local.get(['ttm-show-pinned-tabs']);
     if (pinnedData['ttm-show-pinned-tabs'] !== undefined) {
       state.showPinnedTabs = pinnedData['ttm-show-pinned-tabs'];
     }
-  } catch (e) { }
+
+    // パネル状態の復元
+    const activePanelData = await chrome.storage.local.get(['ttm-active-panel']);
+    if (activePanelData['ttm-active-panel']) {
+      state.activePanel = activePanelData['ttm-active-panel'];
+    }
+
+    // UIの復元
+    restoreSortButtonsUI();
+  } catch (e) {
+    console.error('[TTM] Failed to load user settings:', e);
+  }
   applyColorScheme();
   // 他のコンポーネント用への同期
   chrome.storage.local.set({
     'ttm-shortcuts': state.userSettings.shortcuts || {},
     'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right'
+  });
+}
+
+function restoreSortButtonsUI() {
+  // タブ (分割ボタン)
+  document.querySelectorAll('#panel-tabs .sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === state.tabSortMode);
+  });
+
+  // ツールバーのソートボタン (簡易トグル)
+  const sortBtn = document.getElementById('btn-sort-mode');
+  if (sortBtn) {
+    sortBtn.classList.toggle('sort-mode-active', state.tabSortMode === 'recent');
+    sortBtn.title = state.tabSortMode === 'recent'
+      ? (chrome.i18n.getMessage('sortRecentTooltip') || '並び順: 最近利用')
+      : (chrome.i18n.getMessage('sortTreeTooltip') || '並び順: ツリー');
+  }
+
+  // 履歴
+  document.querySelectorAll('#panel-history .sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === state.historySortMode);
+  });
+  // ブックマーク
+  document.querySelectorAll('#panel-bookmarks .sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === state.bookmarkSortMode);
   });
 }
 
@@ -485,7 +508,10 @@ async function saveUserSettings() {
       'ttm-user-settings': state.userSettings,
       'ttm-shortcuts': state.userSettings.shortcuts || {},
       'ttm-side-panel-side': state.userSettings.sidePanelSide || 'right',
-      'ttm-show-pinned-tabs': state.showPinnedTabs
+      'ttm-show-pinned-tabs': state.showPinnedTabs,
+      'ttm-tab-sort-mode': state.tabSortMode,
+      'ttm-history-sort-mode': state.historySortMode,
+      'ttm-bookmark-sort-mode': state.bookmarkSortMode
     });
 
     // アクションボタンの振る舞いを更新
@@ -581,26 +607,23 @@ function renderNavTabs() {
     nav.appendChild(btn);
   });
 
-  // 保存されたパネルを復元、またはデフォルト
-  chrome.storage.local.get(['ttm-active-panel'], (data) => {
-    const savedPanel = data['ttm-active-panel'];
-    const targetId = (savedPanel && visibleTabs.some(t => t.id === savedPanel)) ? savedPanel : (visibleTabs[0]?.id || 'tabs');
-    state.activePanel = targetId;
+  // ロード済みのパネル状態を同期的に反映
+  const targetId = (state.activePanel && visibleTabs.some(t => t.id === state.activePanel)) ? state.activePanel : (visibleTabs[0]?.id || 'tabs');
+  state.activePanel = targetId;
 
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
 
-    const targetBtn = nav.querySelector(`[data-panel="${targetId}"]`);
-    if (targetBtn) targetBtn.classList.add('active');
-    const targetPanel = document.getElementById(`panel-${targetId}`);
-    if (targetPanel) targetPanel.classList.add('active');
+  const targetBtn = nav.querySelector(`[data-panel="${targetId}"]`);
+  if (targetBtn) targetBtn.classList.add('active');
+  const targetPanel = document.getElementById(`panel-${targetId}`);
+  if (targetPanel) targetPanel.classList.add('active');
 
-    // 初期ロード時の読み込み
-    if (targetId === 'history') loadHistory();
-    if (targetId === 'bookmarks') loadBookmarks();
-    if (targetId === 'snippets') loadSnippets();
-    if (targetId === 'readingList') loadReadingList();
-  });
+  // 初期ロード時のコンテンツ読み込み（タブ以外。タブはinitのloadTabsで処理される）
+  if (targetId === 'history') loadHistory();
+  if (targetId === 'bookmarks') loadBookmarks();
+  if (targetId === 'snippets') loadSnippets();
+  if (targetId === 'readingList') loadReadingList();
 }
 
 // ===== 設定パネル =====
@@ -1005,7 +1028,7 @@ function getRelativeTimeString(ms) {
 // ツリー構造を構築
 function buildTabTree(tabs, parents) {
   if (!tabs || tabs.length === 0) return { roots: [], pinnedRoots: [] };
-  
+
   const tabMap = {};
   tabs.forEach(tab => {
     tabMap[tab.id] = { ...tab, children: [] };
@@ -1239,7 +1262,7 @@ function getMatchingTabs(tabs, query) {
 // タブツリーを描画
 function renderTabTree() {
   const container = document.getElementById('tab-tree');
-  
+
   const matchIds = getMatchingTabs(state.tabs, state.tabQuery);
   const filteredTabs = matchIds ? state.tabs.filter(t => matchIds.has(t.id)) : state.tabs;
 
@@ -1371,7 +1394,7 @@ function renderTabNode(container, tab, depth, isLast = false) {
   const nodeEl = document.createElement('div');
   nodeEl.className = `tab-node ${isLast ? 'is-last' : ''}`;
   nodeEl.dataset.tabId = tab.id;
-  
+
   // 階層に応じたアクセントカラー
   const depthColors = ['var(--accent-blue)', 'var(--accent-green)', 'var(--accent-purple)', 'var(--accent-pink)', 'var(--accent-red)'];
   const accentColor = depthColors[depth % depthColors.length];
@@ -1399,13 +1422,13 @@ function renderTabNode(container, tab, depth, isLast = false) {
 
 function renderTabRecentList(container, tabs) {
   container.innerHTML = '';
-  
+
   if (tabs.length === 0) {
     container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyTabs')}</p></div>`;
     return;
   }
 
-  const sorted = [...tabs].sort((a,b) => (state.tabActivationTime[b.id] || 0) - (state.tabActivationTime[a.id] || 0));
+  const sorted = [...tabs].sort((a, b) => (state.tabActivationTime[b.id] || 0) - (state.tabActivationTime[a.id] || 0));
 
   sorted.forEach(tab => {
     const nodeEl = document.createElement('div');
@@ -1418,7 +1441,7 @@ function renderTabRecentList(container, tabs) {
 
 function renderTabCloud(container, tabs) {
   container.innerHTML = '';
-  
+
   if (tabs.length === 0) {
     container.innerHTML = `<div class="empty-state"><p>${chrome.i18n.getMessage('emptyTabs')}</p></div>`;
     return;
@@ -1429,7 +1452,7 @@ function renderTabCloud(container, tabs) {
   tabs.forEach(tab => {
     const normalizedUrl = (tab.url || '').split('#')[0];
     const groupKey = `${tab.title || ''}||${normalizedUrl}`;
-    
+
     if (aggregated.has(groupKey)) {
       const existing = aggregated.get(groupKey);
       existing.tabIds.push(tab.id);
@@ -1471,15 +1494,15 @@ function renderTabCloud(container, tabs) {
 
   // ソート
   if (state.tabCloudSortMode === 'order') {
-    uniqueItems.sort((a,b) => Math.min(...a.indices) - Math.min(...b.indices));
+    uniqueItems.sort((a, b) => Math.min(...a.indices) - Math.min(...b.indices));
   } else if (state.tabCloudSortMode === 'frequency') {
-    uniqueItems.sort((a,b) => {
+    uniqueItems.sort((a, b) => {
       const normalizedA = (a.url || '').split('#')[0];
       const normalizedB = (b.url || '').split('#')[0];
       return (state.visitCountMap[normalizedB] || 0) - (state.visitCountMap[normalizedA] || 0);
     });
   } else {
-    uniqueItems.sort((a,b) => Math.max(...b.activationTimes) - Math.max(...a.activationTimes));
+    uniqueItems.sort((a, b) => Math.max(...b.activationTimes) - Math.max(...a.activationTimes));
   }
 
   const cloudContainer = document.createElement('div');
@@ -1504,19 +1527,19 @@ function renderTabCloud(container, tabs) {
 function createTabCloudItem(item, maxCount, minCount) {
   const el = document.createElement('div');
   el.className = 'cloud-item';
-  
+
   const normalizedUrl = (item.url || '').split('#')[0];
   const count = state.visitCountMap[normalizedUrl] || 0;
   const weight = maxCount > 0 ? (Math.log(count + 1) / Math.log(maxCount + 1)) : 0.5;
-  
+
   const fontSize = 10 + (weight * 8);
   el.style.fontSize = `${fontSize}px`;
-  
+
   if (weight > 0.6) {
     el.style.fontWeight = '600';
     el.classList.add('premium');
   }
-  
+
   const opacity = 0.05 + (weight * 0.15);
   el.style.background = `linear-gradient(135deg, color-mix(in srgb, var(--theme-color) ${Math.round(opacity * 100)}%, var(--bg-tertiary)), var(--bg-tertiary))`;
 
@@ -1525,7 +1548,7 @@ function createTabCloudItem(item, maxCount, minCount) {
   const displayTitle = rawTitle.length > 20 ? rawTitle.substring(0, 20) + '...' : rawTitle;
 
   el.innerHTML = `
-    ${faviconUrl 
+    ${faviconUrl
       ? `<img class="bookmark-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
       : `<svg class="bookmark-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
     }
@@ -2636,6 +2659,7 @@ document.querySelectorAll('#panel-tabs .sort-btn').forEach(btn => {
     document.querySelectorAll('#panel-tabs .sort-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.tabSortMode = btn.dataset.sort;
+    saveUserSettings(); // 直ちに保存
     renderTabTree();
   });
 });
@@ -2654,21 +2678,23 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 
   const key = e.key.toLowerCase();
-  
+
   // パネル切り替え
   if (['t', 'h', 'f', 's', 'c'].includes(key)) {
     const mapping = { 't': 'tabs', 'h': 'history', 'f': 'bookmarks', 's': 'settings', 'c': 'snippets' };
     switchPanel(mapping[key]);
   }
-  
+
   // 検索フォーカス
   if (key === '/') {
     e.preventDefault();
     const activePanelId = state.activePanel;
     let searchId = `${activePanelId}-search`;
-    // ブックマークは特別（スペルの問題等あれば微調整）
+
+    // IDの不一致を修正
+    if (activePanelId === 'tabs') searchId = 'tab-search';
     if (activePanelId === 'bookmarks') searchId = 'bookmark-search';
-    
+
     const searchInput = document.getElementById(searchId);
     if (searchInput) {
       searchInput.focus();
@@ -2760,7 +2786,7 @@ async function loadSessionList() {
         if (e.target.closest('.session-delete')) return;
         try {
           await sendMessage('RESTORE_SESSION', { sessionId: session.id });
-          closeModal('modal-load-session');
+          closeModal('modal-sessions');
           showToast(chrome.i18n.getMessage('toastSessionRestored'), 'success');
         } catch {
           showToast(chrome.i18n.getMessage('toastSessionRestoreFailed'), 'error');
@@ -2971,7 +2997,7 @@ function renderHistory(items, query = '', recentSessions = []) {
 
 function renderHistoryUniqueList(container, items, query = '') {
   container.innerHTML = '';
-  
+
   if (items.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd"/></svg>
@@ -2998,14 +3024,14 @@ function renderHistoryUniqueList(container, items, query = '') {
   });
 
   const uniqueItems = Array.from(aggregated.values())
-                      .sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
+    .sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
 
   // 2. 連続する同一ドメインをグループ化
   const groups = [];
   uniqueItems.forEach(item => {
     let domain = '';
-    try { domain = new URL(item.url).hostname; } catch(e) {}
-    
+    try { domain = new URL(item.url).hostname; } catch (e) { }
+
     const lastGroup = groups[groups.length - 1];
     if (lastGroup && lastGroup.domain === domain && domain !== '') {
       lastGroup.items.push(item);
@@ -3020,12 +3046,12 @@ function renderHistoryUniqueList(container, items, query = '') {
       // ドメイングループを作成
       const groupWrapper = document.createElement('div');
       groupWrapper.className = 'history-domain-group-wrapper';
-      
+
       const groupHeader = document.createElement('div');
       groupHeader.className = 'history-item domain-header collapsed';
-      
+
       const faviconUrl = getFaviconUrl(group.items[0].url);
-      
+
       groupHeader.innerHTML = `
         <div class="domain-toggle">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 6 8 10 12 6"></polyline></svg>
@@ -3043,7 +3069,7 @@ function renderHistoryUniqueList(container, items, query = '') {
 
       const childrenContainer = document.createElement('div');
       childrenContainer.className = 'history-domain-children hidden';
-      
+
       group.items.forEach(item => {
         childrenContainer.appendChild(createHistoryItemElement(item, query, true));
       });
@@ -3105,7 +3131,7 @@ function createHistoryItemElement(item, query, isNested = false) {
 
 function renderHistoryCloud(container, items, query = '') {
   container.innerHTML = '';
-  
+
   if (items.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd"/></svg>
@@ -3156,9 +3182,9 @@ function renderHistoryCloud(container, items, query = '') {
 
   // ソート
   if (state.historyCloudSortMode === 'most-visited') {
-    uniqueItems.sort((a,b) => (b.visitCount || 0) - (a.visitCount || 0));
+    uniqueItems.sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0));
   } else {
-    uniqueItems.sort((a,b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
+    uniqueItems.sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0));
   }
 
   const cloudContainer = document.createElement('div');
@@ -3179,18 +3205,18 @@ function renderHistoryCloud(container, items, query = '') {
 function createHistoryCloudItem(item, maxCount, minCount, query = '') {
   const el = document.createElement('div');
   el.className = 'cloud-item';
-  
+
   const count = item.visitCount || 0;
   const weight = maxCount > 0 ? (Math.log(count + 1) / Math.log(maxCount + 1)) : 0.5;
-  
+
   const fontSize = 10 + (weight * 8);
   el.style.fontSize = `${fontSize}px`;
-  
+
   if (weight > 0.6) {
     el.style.fontWeight = '600';
     el.classList.add('premium');
   }
-  
+
   const opacity = 0.05 + (weight * 0.15);
   el.style.background = `linear-gradient(135deg, color-mix(in srgb, var(--theme-color) ${Math.round(opacity * 100)}%, var(--bg-tertiary)), var(--bg-tertiary))`;
 
@@ -3199,7 +3225,7 @@ function createHistoryCloudItem(item, maxCount, minCount, query = '') {
   const displayTitle = rawTitle.length > 20 ? rawTitle.substring(0, 20) + '...' : rawTitle;
 
   el.innerHTML = `
-    ${faviconUrl 
+    ${faviconUrl
       ? `<img class="bookmark-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
       : `<svg class="bookmark-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
     }
@@ -3236,9 +3262,9 @@ function createHistoryCloudItem(item, maxCount, minCount, query = '') {
         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`,
         danger: true,
         action: async () => {
-             await chrome.history.deleteUrl({ url: item.url });
-             el.remove();
-             showToast(chrome.i18n.getMessage('toastHistoryDeleted'));
+          await chrome.history.deleteUrl({ url: item.url });
+          el.remove();
+          showToast(chrome.i18n.getMessage('toastHistoryDeleted'));
         }
       }
     ]);
@@ -3274,6 +3300,7 @@ document.querySelectorAll('#panel-history .sort-btn').forEach(btn => {
     document.querySelectorAll('#panel-history .sort-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.historySortMode = btn.dataset.sort;
+    saveUserSettings();
     loadHistory(document.getElementById('history-search').value.trim());
   });
 });
@@ -3284,7 +3311,7 @@ let bookmarkSearchTimeout = null;
 async function loadBookmarks(force = false) {
   if (state.isBookmarkLoading) return;
   const container = document.getElementById('bookmark-list');
-  
+
   // キャッシュがあり、かつ強制リロード（バックグラウンド更新時など）でなければ描画のみ
   if (!force && state.bookmarkTree && state.bookmarkFlatList.length > 0) {
     renderBookmarks();
@@ -3300,7 +3327,7 @@ async function loadBookmarks(force = false) {
   try {
     // 1. バックグラウンドからキャッシュを取得試行
     const resp = await sendMessage('GET_BOOKMARKS_CACHE');
-    
+
     if (resp && resp.tree && resp.flatList) {
       state.bookmarkTree = resp.tree;
       state.bookmarkFlatList = resp.flatList;
@@ -3499,19 +3526,19 @@ function renderBookmarkCloud(container, items) {
 function createCloudItem(item, maxCount, minCount) {
   const el = document.createElement('div');
   el.className = 'cloud-item';
-  
+
   const count = state.visitCountMap[item.url] || 0;
   const weight = maxCount > 0 ? (Math.log(count + 1) / Math.log(maxCount + 1)) : 0.5;
-  
+
   const fontSize = 10 + (weight * 8);
   el.style.fontSize = `${fontSize}px`;
-  
+
   // 透明度や色を訪問回数に応じて調整（高級感のあるグラデーションの準備）
   if (weight > 0.6) {
     el.style.fontWeight = '600';
     el.classList.add('premium');
   }
-  
+
   // 訪問回数が多いほど背景を強調
   const opacity = 0.05 + (weight * 0.15);
   el.style.background = `linear-gradient(135deg, color-mix(in srgb, var(--theme-color) ${Math.round(opacity * 100)}%, var(--bg-tertiary)), var(--bg-tertiary))`;
@@ -3521,7 +3548,7 @@ function createCloudItem(item, maxCount, minCount) {
   const displayTitle = rawTitle.length > 20 ? rawTitle.substring(0, 20) + '...' : rawTitle;
 
   el.innerHTML = `
-    ${faviconUrl 
+    ${faviconUrl
       ? `<img class="bookmark-favicon" src="${escapeHtml(faviconUrl)}" onerror="this.style.display='none'" alt="">`
       : `<svg class="bookmark-favicon" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm3 1v10h10V3H3z"/></svg>`
     }
@@ -3771,6 +3798,7 @@ document.querySelectorAll('#panel-bookmarks .sort-btn').forEach(btn => {
     document.querySelectorAll('#panel-bookmarks .sort-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.bookmarkSortMode = btn.dataset.sort;
+    saveUserSettings();
     updateVisitCountToggleBtn();
     renderBookmarks();
   });
@@ -3947,8 +3975,8 @@ chrome.runtime.onMessage.addListener((message) => {
     case 'TAB_ACTIVATED':
       state.activeTabId = message.tabId;
       state.tabActivationTime[message.tabId] = Date.now();
-      try { localStorage.setItem(`ttm-tab-activation-${message.tabId}`, String(Date.now())); } catch(e) {}
-      
+      try { localStorage.setItem(`ttm-tab-activation-${message.tabId}`, String(Date.now())); } catch (e) { }
+
       if (document.getElementById('panel-tabs').classList.contains('active')) {
         if (state.tabSortMode === 'recent') {
           renderTabTree();
@@ -4191,7 +4219,7 @@ function renderSnippets() {
   state.snippetFolders.forEach(folder => {
     const folderSnippets = state.snippets.filter(s => s.folderId === folder.id);
     const matchesFolder = folder.name.toLowerCase().includes(q);
-    const matchedSnippets = folderSnippets.filter(s => 
+    const matchedSnippets = folderSnippets.filter(s =>
       s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q)
     );
 
@@ -4297,7 +4325,7 @@ function createSnippetItem(s) {
   item.className = 'list-item snippet-item';
   item.draggable = true;
   item.dataset.id = s.id;
-  
+
   const clickCount = s.clickCount || 0;
   item.innerHTML = `
     <div class="list-item-icon">
@@ -4407,7 +4435,7 @@ document.getElementById('btn-save-edit-snippet')?.addEventListener('click', asyn
   const url = document.getElementById('edit-snippet-url').value.trim();
   const text = document.getElementById('edit-snippet-text').value.trim();
   const description = document.getElementById('edit-snippet-desc').value.trim();
-  
+
   await sendMessage('UPDATE_SNIPPET', {
     snippet: {
       id: state.currentEditSnippetId,
@@ -4417,7 +4445,7 @@ document.getElementById('btn-save-edit-snippet')?.addEventListener('click', asyn
       description: description
     }
   });
-  
+
   document.getElementById('modal-snippet-edit').classList.add('hidden');
   state.currentEditSnippetId = null;
 });

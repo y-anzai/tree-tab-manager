@@ -727,5 +727,8 @@
   },
   "msgNoSelection": {
     "message": "テキストを選択してから実行してください。"
+  },
+  "tabSearchPlaceholder": {
+    "message": "タブを検索..."
   }
 }
