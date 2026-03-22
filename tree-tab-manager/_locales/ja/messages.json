@@ -739,5 +739,8 @@
   },
   "snippetSearchPlaceholder": {
     "message": "スニペット（スクラップ）を検索..."
+  },
+  "msgNoSelection": {
+    "message": "テキストを選択してから実行してください。"
   }
 }

@@ -471,19 +471,56 @@ body[data-focus-intensity]:not(.sidepanel-focused) .tab-item.active-tab .tab-pin
   font-weight: 500;
 }
 
-/* 子ツリー */
+/* 垂直ガイド線 (全体) */
 .tab-children {
   overflow: hidden;
   transition: max-height 200ms ease, opacity 200ms ease;
-  margin-left: 11px;
-  /* トグルの中心にガイド線を合わせる */
-  padding-left: 5px;
-  /* 合計 16px インデント */
-  border-left: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  margin-left: 10px;
+  padding-left: 14px;
+  position: relative;
 }
 
-.tab-children:hover {
-  border-left-color: var(--theme-color);
+/* 各ノードのコネクタ（L字の一部） */
+.tab-node::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: color-mix(in srgb, var(--depth-color) 40%, transparent);
+  transition: all var(--transition);
+}
+
+/* 最後のノードは垂直線を途中で止める */
+.tab-node.is-last::before {
+  bottom: auto;
+  height: 17px;
+}
+
+/* 水平コネクタ */
+.tab-node::after {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 16px;
+  width: 14px;
+  height: 1.5px;
+  background: color-mix(in srgb, var(--depth-color) 40%, transparent);
+  transition: all var(--transition);
+}
+
+/* ホバー時にガイド線を強調 */
+.tab-node:hover::before,
+.tab-node:hover::after {
+  background: var(--depth-color);
+  box-shadow: 0 0 4px var(--depth-color);
+}
+
+/* トグルの色も階層に合わせる */
+.tab-node .tab-toggle {
+  color: var(--depth-color);
+  opacity: 0.8;
 }
 
 .tab-children.collapsed {

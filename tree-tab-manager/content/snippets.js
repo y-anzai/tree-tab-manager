@@ -7,7 +7,7 @@
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'CAPTURE_SNIPPET') {
-      captureAndShowDialog();
+      captureAndShowDialog(message.selectionText);
     } else if (message.type === 'SCROLL_TO_POSITION') {
       const { scrollY, text } = message;
       let attempts = 0;
@@ -198,13 +198,13 @@
     }
   }
 
-  function captureAndShowDialog() {
+  function captureAndShowDialog(providedText) {
     const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
+    const selectedText = providedText || selection.toString().trim();
     
     // 選択範囲がない場合は終了
     if (!selectedText) {
-      alert(chrome.i18n.getMessage('emptyTabs')); // または適切なメッセージ
+      alert(chrome.i18n.getMessage('msgNoSelection') || 'Please select some text first.');
       return;
     }
 
