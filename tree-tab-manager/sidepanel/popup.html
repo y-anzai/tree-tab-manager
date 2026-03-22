@@ -236,6 +236,51 @@
     </div>
   </div>
 
+  <!-- Google Drive パネル -->
+  <div id="panel-googleDrive" class="panel">
+    <div class="search-bar">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd"
+          d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+          clip-rule="evenodd" />
+      </svg>
+      <input type="text" id="drive-search" placeholder="Driveを検索..." data-i18n-placeholder="driveSearchPlaceholder"
+        class="search-input">
+      <button class="toolbar-btn" id="btn-search-drive-external" title="Driveで検索">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+        </svg>
+      </button>
+      <button class="toolbar-btn" id="btn-refresh-drive" title="更新" data-i18n-title="btnRefreshDrive">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z"
+            clip-rule="evenodd" />
+        </svg>
+      </button>
+    </div>
+    <div class="drive-toolbar">
+      <div class="drive-view-toggle">
+        <button id="btn-drive-view-recent" class="toolbar-btn active" data-i18n="driveRecentTitle">最近利用</button>
+        <button id="btn-drive-view-tree" class="toolbar-btn" data-i18n="driveFoldersTitle">ツリー表示</button>
+      </div>
+      <div id="drive-sort-controls" class="drive-sort-options hidden">
+        <button id="btn-drive-toggle-files" class="sort-btn active">ファイル表示</button>
+        <button id="btn-drive-sort-name" class="sort-btn active">名前</button>
+        <button id="btn-drive-sort-modified" class="sort-btn">更新順</button>
+        <button id="btn-drive-sort-opened" class="sort-btn">開封順</button>
+      </div>
+    </div>
+    <div class="drive-container" id="drive-content">
+      <div id="drive-recent-section" class="drive-section">
+        <div id="drive-recent-list" class="drive-list"></div>
+      </div>
+      <div id="drive-tree-section" class="drive-section hidden">
+        <div id="drive-tree" class="drive-tree"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- 設定パネル -->
   <div id="panel-settings" class="panel">
     <div class="settings-container">

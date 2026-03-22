@@ -54,6 +54,12 @@ const state = {
   snippetFolders: [],
   snippetFolderCollapseState: {},
   snippetQuery: '',
+  googleDriveCache: null,
+  driveCollapseState: {}, // folderId -> boolean
+  driveRefreshTimer: null,
+  driveViewMode: 'recent', // 'recent' | 'tree'
+  driveSortOrder: 'name', // 'name' | 'modified' | 'opened'
+  driveShowFiles: true, // ツリー表示でファイルも含めるか
   currentEditSnippetId: null,
   currentEditFolderId: null,
 
@@ -100,6 +106,7 @@ const DEFAULT_TAB_CONFIG = [
   { id: 'history', label: chrome.i18n.getMessage('navHistory'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>' },
   { id: 'bookmarks', label: chrome.i18n.getMessage('navBookmarks'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg>' },
   { id: 'snippets', label: chrome.i18n.getMessage('navSnippets'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>' },
+  { id: 'googleDrive', label: chrome.i18n.getMessage('navGoogleDrive'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.173 1.107a.75.75 0 011.05-.224l3.193 2.19h5.334a1.75 1.75 0 011.75 1.75v10.5a1.75 1.75 0 01-1.75 1.75H4.25a1.75 1.75 0 01-1.75-1.75v-11.5a.75.75 0 011.187-.611l2.486 1.734z"/></svg>' },
   { id: 'readingList', label: chrome.i18n.getMessage('navReadingList'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>' },
   { id: 'settings', label: chrome.i18n.getMessage('navSettings'), visible: true, icon: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>' }
 ];
@@ -571,12 +578,15 @@ function renderNavTabs() {
   nav.innerHTML = '';
 
   const visibleTabs = state.tabConfig.filter(t => t.visible);
+  const isCompact = visibleTabs.length >= 7;
+  nav.classList.toggle('compact-nav', isCompact);
 
   visibleTabs.forEach(tab => {
     const btn = document.createElement('button');
     btn.className = `tab-btn ${tab.id === currentActive ? 'active' : ''}`;
     btn.dataset.panel = tab.id;
-    btn.innerHTML = `${tab.icon} ${escapeHtml(tab.label)}`;
+    btn.title = tab.label; // ツールチップ追加
+    btn.innerHTML = `${tab.icon} <span class="tab-label">${escapeHtml(tab.label)}</span>`;
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -597,6 +607,7 @@ function renderNavTabs() {
         bookmarksDirty = false;
       }
       if (tab.id === 'snippets') loadSnippets();
+      if (tab.id === 'googleDrive') loadGoogleDrive();
       if (tab.id === 'readingList') loadReadingList();
       // タブパネルに切り替えたとき、ダーティなら再同期
       if (tab.id === 'tabs' && tabsDirty) {
@@ -623,6 +634,7 @@ function renderNavTabs() {
   if (targetId === 'history') loadHistory();
   if (targetId === 'bookmarks') loadBookmarks();
   if (targetId === 'snippets') loadSnippets();
+  if (targetId === 'googleDrive') loadGoogleDrive();
   if (targetId === 'readingList') loadReadingList();
 }
 
@@ -2680,8 +2692,8 @@ window.addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
 
   // パネル切り替え
-  if (['t', 'h', 'f', 's', 'c'].includes(key)) {
-    const mapping = { 't': 'tabs', 'h': 'history', 'f': 'bookmarks', 's': 'settings', 'c': 'snippets' };
+  if (['t', 'h', 'f', 's', 'c', 'g'].includes(key)) {
+    const mapping = { 't': 'tabs', 'h': 'history', 'f': 'bookmarks', 's': 'settings', 'c': 'snippets', 'g': 'googleDrive' };
     switchPanel(mapping[key]);
   }
 
@@ -2694,6 +2706,7 @@ window.addEventListener('keydown', (e) => {
     // IDの不一致を修正
     if (activePanelId === 'tabs') searchId = 'tab-search';
     if (activePanelId === 'bookmarks') searchId = 'bookmark-search';
+    if (activePanelId === 'googleDrive') searchId = 'drive-search';
 
     const searchInput = document.getElementById(searchId);
     if (searchInput) {
@@ -4020,6 +4033,399 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+// ===== Google Drive パネル =====
+function initDriveSearch() {
+  const driveSearchInput = document.getElementById('drive-search');
+  if (driveSearchInput) {
+    driveSearchInput.oninput = (e) => {
+      driveSearchQuery = e.target.value;
+      renderGoogleDrive();
+    };
+    
+    // エンターキーでGoogle Drive本体の検索ページを開く
+    driveSearchInput.addEventListener('keydown', (e) => {
+      // 変換中（IME）のエンターは無視する
+      if (e.isComposing || e.keyCode === 229) return;
+      
+      if (e.key === 'Enter') {
+        executeExternalDriveSearch(e.target.value);
+      }
+    });
+  }
+
+  const btnSearchExternal = document.getElementById('btn-search-drive-external');
+  if (btnSearchExternal) {
+    btnSearchExternal.onclick = () => {
+      const input = document.getElementById('drive-search');
+      if (input) executeExternalDriveSearch(input.value);
+    };
+  }
+
+  const btnRefreshDrive = document.getElementById('btn-refresh-drive');
+  if (btnRefreshDrive) {
+    btnRefreshDrive.addEventListener('click', () => {
+      refreshGoogleDrive();
+    });
+  }
+}
+
+function executeExternalDriveSearch(queryText) {
+  const query = (queryText || '').trim();
+  if (query) {
+    chrome.tabs.create({
+      url: `https://drive.google.com/drive/search?q=${encodeURIComponent(query)}`
+    });
+  }
+}
+
+function initDriveToolbar() {
+  const btnRecent = document.getElementById('btn-drive-view-recent');
+  const btnTree = document.getElementById('btn-drive-view-tree');
+  const sortCtl = document.getElementById('drive-sort-controls');
+  const recSec = document.getElementById('drive-recent-section');
+  const treeSec = document.getElementById('drive-tree-section');
+
+  if (btnRecent && btnTree) {
+    btnRecent.onclick = () => {
+      state.driveViewMode = 'recent';
+      btnRecent.classList.add('active');
+      btnTree.classList.remove('active');
+      sortCtl?.classList.add('hidden');
+      recSec?.classList.remove('hidden');
+      treeSec?.classList.add('hidden');
+      renderGoogleDrive();
+    };
+    btnTree.onclick = () => {
+      state.driveViewMode = 'tree';
+      btnTree.classList.add('active');
+      btnRecent.classList.remove('active');
+      sortCtl?.classList.remove('hidden');
+      recSec?.classList.add('hidden');
+      treeSec?.classList.remove('hidden');
+      renderGoogleDrive();
+    };
+  }
+
+  // ソートボタンの初期化
+  const sortIds = ['name', 'modified', 'opened'];
+  sortIds.forEach(id => {
+    const btn = document.getElementById(`btn-drive-sort-${id}`);
+    if (btn) {
+      btn.onclick = () => {
+        state.driveSortOrder = id;
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderGoogleDriveTree();
+      };
+    }
+  });
+
+  // ファイル表示切り替え
+  const btnToggleFiles = document.getElementById('btn-drive-toggle-files');
+  if (btnToggleFiles) {
+    btnToggleFiles.onclick = () => {
+      state.driveShowFiles = !state.driveShowFiles;
+      btnToggleFiles.classList.toggle('active', state.driveShowFiles);
+      renderGoogleDriveTree();
+    };
+  }
+}
+
+let driveSearchQuery = '';
+
+async function loadGoogleDrive() {
+  const container = document.getElementById('drive-content');
+  if (!container) return;
+
+  // 1. キャッシュから即座に表示
+  const data = await chrome.storage.local.get('ttm-google-drive-cache');
+  state.googleDriveCache = data['ttm-google-drive-cache'] || null;
+
+  if (state.googleDriveCache) {
+    renderGoogleDrive();
+  } else {
+    // キャッシュがない場合は取得を試みる（非インタラクティブ）
+    refreshGoogleDrive(false);
+  }
+
+  // 2. 5秒後に最新状態を取得して更新 (ユーザーリクエスト)
+  if (state.driveRefreshTimer) clearTimeout(state.driveRefreshTimer);
+  state.driveRefreshTimer = setTimeout(() => {
+    refreshGoogleDrive();
+  }, 5000);
+}
+
+async function refreshGoogleDrive(interactive = false) {
+  const btn = document.getElementById('btn-refresh-drive');
+  const container = document.getElementById('drive-content');
+  if (btn) btn.classList.add('spinning');
+  
+  if (!state.googleDriveCache && container) {
+    container.innerHTML = `
+      <div class="loading">
+        <div class="loading-spinner"></div>
+        <span data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</span>
+      </div>
+    `;
+  }
+
+  try {
+    const response = await sendMessage(interactive ? 'LOGIN_GOOGLE_DRIVE' : 'GET_GOOGLE_DRIVE_REFRESH');
+    if (response && response.success) {
+      const data = await chrome.storage.local.get('ttm-google-drive-cache');
+      state.googleDriveCache = data['ttm-google-drive-cache'] || null;
+      renderGoogleDrive();
+    } else if (!state.googleDriveCache) {
+      renderDriveLoginPrompt();
+    }
+  } catch (e) {
+    console.error('[TTM] Drive refresh failed:', e);
+    if (!state.googleDriveCache) renderDriveLoginPrompt();
+  } finally {
+    if (btn) btn.classList.remove('spinning');
+  }
+}
+
+function renderDriveLoginPrompt() {
+  const container = document.getElementById('drive-content');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="empty-state" style="padding: 40px 20px;">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 20px;">
+        <path d="M6.173 1.107a.75.75 0 011.05-.224l3.193 2.19h5.334a1.75 1.75 0 011.75 1.75v10.5a1.75 1.75 0 01-1.75 1.75H4.25a1.75 1.75 0 01-1.75-1.75v-11.5a.75.75 0 011.187-.611l2.486 1.734z"/>
+      </svg>
+      <p style="margin-bottom: 20px; color: var(--text-muted); font-size: 14px;" data-i18n="driveLoginPrompt">${chrome.i18n.getMessage('driveLoginPrompt')}</p>
+      <button id="btn-drive-login" class="primary-btn">
+        <span data-i18n="driveLoginButton">${chrome.i18n.getMessage('driveLoginButton')}</span>
+      </button>
+    </div>
+  `;
+
+  const loginBtn = document.getElementById('btn-drive-login');
+  if (loginBtn) {
+    loginBtn.onclick = () => refreshGoogleDrive(true);
+  }
+}
+
+function renderGoogleDrive() {
+  if (!state.googleDriveCache) {
+    const container = document.getElementById('drive-content');
+    if (container) {
+      container.innerHTML = `
+        <div class="loading">
+          <div class="loading-spinner"></div>
+          <span data-i18n="msgLoading">${chrome.i18n.getMessage('msgLoading')}</span>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  if (state.driveViewMode === 'recent') {
+    renderDriveRecentList();
+  } else {
+    renderGoogleDriveTree();
+  }
+}
+
+function renderDriveRecentList() {
+  const container = document.getElementById('drive-recent-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const query = driveSearchQuery.toLowerCase();
+  const filtered = (state.googleDriveCache.recent || []).filter(item => 
+    item.name.toLowerCase().includes(query)
+  );
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="drive-meta">${chrome.i18n.getMessage('emptyTabs')}</div>`;
+    return;
+  }
+
+  filtered.forEach(item => {
+    container.appendChild(createDriveItemElement(item));
+  });
+}
+
+function createDriveItemElement(item) {
+  const el = document.createElement('div');
+  el.className = 'drive-item';
+  el.title = item.name;
+
+  const icon = item.iconLink || 'https://www.gstatic.com/images/branding/product/1x/drive_48dp.png';
+  const viewedTime = item.viewedByMeTime ? new Date(item.viewedByMeTime).toLocaleString() : '';
+
+  el.innerHTML = `
+    <img src="${icon}" class="drive-icon" />
+    <div class="drive-info">
+      <div class="drive-name">${escapeHtml(item.name)}</div>
+      <div class="drive-meta">${viewedTime}</div>
+    </div>
+  `;
+
+  el.onclick = () => {
+    if (item.webViewLink) chrome.tabs.create({ url: item.webViewLink });
+  };
+
+  return el;
+}
+
+function renderGoogleDriveTree() {
+  const container = document.getElementById('drive-tree');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const allFiles = state.googleDriveCache.allFiles || [];
+  if (allFiles.length === 0) {
+    container.innerHTML = `<div class="drive-meta">No items found</div>`;
+    return;
+  }
+
+  // ツリー構築
+  const itemMap = {};
+  allFiles.forEach(f => itemMap[f.id] = { ...f, children: [] });
+  
+  const roots = [];
+  allFiles.forEach(f => {
+    const parentId = f.parents?.[0];
+    if (parentId && itemMap[parentId]) {
+      itemMap[parentId].children.push(itemMap[f.id]);
+    } else {
+      roots.push(itemMap[f.id]);
+    }
+  });
+
+  const query = driveSearchQuery.toLowerCase();
+  
+  const treeRoot = document.createElement('div');
+  treeRoot.className = 'drive-tree-node root';
+  
+  // ルート要素もソートする
+  roots.sort((a,b) => {
+    const aFolder = a.mimeType === 'application/vnd.google-apps.folder' ? 0 : 1;
+    const bFolder = b.mimeType === 'application/vnd.google-apps.folder' ? 0 : 1;
+    if (aFolder !== bFolder) return aFolder - bFolder;
+
+    if (state.driveSortOrder === 'name') {
+      return a.name.localeCompare(b.name);
+    } else if (state.driveSortOrder === 'modified') {
+      return new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0);
+    } else if (state.driveSortOrder === 'opened') {
+      return new Date(b.viewedByMeTime || 0) - new Date(a.viewedByMeTime || 0);
+    }
+    return 0;
+  }).forEach(root => {
+    renderDriveTreeNode(treeRoot, root, 0, query);
+  });
+  
+  container.appendChild(treeRoot);
+}
+
+function renderDriveTreeNode(parentEl, node, depth, query) {
+  const isFolder = node.mimeType === 'application/vnd.google-apps.folder';
+  
+  // 検索ヒットチェック (自分または子孫)
+  const isMatch = node.name.toLowerCase().includes(query);
+  const hasMatchingChild = isFolder && (node.children || []).some(c => checkDriveNodeMatch(c, query));
+  
+  // ファイル表示がオフで、かつフォルダではない場合はスキップ (ただしフォルダ内の子孫チェック用には残す必要があるが、描画時に判定する)
+  if (!state.driveShowFiles && !isFolder) return;
+  
+  if (query && !isMatch && !hasMatchingChild) return;
+
+  const nodeEl = document.createElement('div');
+  nodeEl.className = 'drive-tree-node';
+  
+  if (isFolder) {
+    const header = document.createElement('div');
+    const isCollapsed = state.driveCollapseState[node.id] !== undefined 
+      ? state.driveCollapseState[node.id] 
+      : (query ? false : true); 
+      
+    header.className = `drive-folder-header ${isCollapsed ? 'collapsed' : ''}`;
+    
+    const hasChildren = node.children && node.children.length > 0;
+    const toggleIcon = hasChildren 
+      ? `<svg class="drive-folder-toggle" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`
+      : '<div style="width:16px;"></div>';
+
+    header.innerHTML = `
+      ${toggleIcon}
+      <svg class="drive-folder-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+      <span class="drive-folder-name">${escapeHtml(node.name)}</span>
+      <button class="drive-open-btn" title="Driveで開く">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" /><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" /></svg>
+      </button>
+    `;
+
+    header.onclick = (e) => {
+      // 開くボタンクリック時はそちらを優先
+      if (e.target.closest('.drive-open-btn')) {
+        e.stopPropagation();
+        if (node.webViewLink) chrome.tabs.create({ url: node.webViewLink });
+        return;
+      }
+
+      e.stopPropagation();
+      if (!hasChildren) return;
+      const newState = !header.classList.contains('collapsed');
+      state.driveCollapseState[node.id] = newState;
+      header.classList.toggle('collapsed', newState);
+      const childContainer = nodeEl.querySelector('.drive-folder-children');
+      if (childContainer) childContainer.classList.toggle('hidden', newState);
+    };
+
+    nodeEl.appendChild(header);
+
+    if (hasChildren) {
+      const childContainer = document.createElement('div');
+      childContainer.className = `drive-folder-children ${isCollapsed ? 'hidden' : ''}`;
+      
+      // フォルダを上に、設定された順序でソート
+      node.children.sort((a,b) => {
+        const aFolder = a.mimeType === 'application/vnd.google-apps.folder' ? 0 : 1;
+        const bFolder = b.mimeType === 'application/vnd.google-apps.folder' ? 0 : 1;
+        if (aFolder !== bFolder) return aFolder - bFolder;
+
+        if (state.driveSortOrder === 'name') {
+          return a.name.localeCompare(b.name);
+        } else if (state.driveSortOrder === 'modified') {
+          return new Date(b.modifiedTime || 0) - new Date(a.modifiedTime || 0);
+        } else if (state.driveSortOrder === 'opened') {
+          return new Date(b.viewedByMeTime || 0) - new Date(a.viewedByMeTime || 0);
+        }
+        return 0;
+      }).forEach(child => {
+        renderDriveTreeNode(childContainer, child, depth + 1, query);
+      });
+      nodeEl.appendChild(childContainer);
+    }
+  } else {
+    // ファイルを表示
+    const fileEl = document.createElement('div');
+    fileEl.className = 'drive-file-item';
+    const icon = node.iconLink || 'https://www.gstatic.com/images/branding/product/1x/drive_48dp.png';
+    fileEl.innerHTML = `
+      <img src="${icon}" class="drive-icon" />
+      <span class="drive-file-name">${escapeHtml(node.name)}</span>
+    `;
+    fileEl.onclick = (e) => {
+      e.stopPropagation();
+      if (node.webViewLink) chrome.tabs.create({ url: node.webViewLink });
+    };
+    nodeEl.appendChild(fileEl);
+  }
+
+  parentEl.appendChild(nodeEl);
+}
+
+function checkDriveNodeMatch(node, query) {
+  if (node.name.toLowerCase().includes(query)) return true;
+  return (node.children || []).some(c => checkDriveNodeMatch(c, query));
+}
+
 // ===== 初期化 =====
 async function init() {
   localizeHtmlPage();
@@ -4036,6 +4442,8 @@ async function init() {
   applyTabSelectionAnimationUI();
   await refreshGoogleTasks();
   await loadTabs();
+  initDriveSearch();
+  initDriveToolbar();
 }
 
 async function refreshGoogleTasks() {

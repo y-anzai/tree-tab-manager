@@ -70,7 +70,8 @@
   "oauth2": {
     "client_id": "1015811003439-voe4ooenkr68lis3hhs1dpoajrefum2k.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/tasks"
+      "https://www.googleapis.com/auth/tasks",
+      "https://www.googleapis.com/auth/drive.metadata.readonly"
     ]
   }
 }

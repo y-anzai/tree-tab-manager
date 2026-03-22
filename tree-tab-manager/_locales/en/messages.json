@@ -739,5 +739,26 @@
     },
     "tabSearchPlaceholder": {
         "message": "Search tabs..."
+    },
+    "navGoogleDrive": {
+        "message": "Drive"
+    },
+    "driveRecentTitle": {
+        "message": "Recent files"
+    },
+    "driveFoldersTitle": {
+        "message": "Folders"
+    },
+    "driveSearchPlaceholder": {
+        "message": "Search Drive..."
+    },
+    "btnRefreshDrive": {
+        "message": "Refresh Drive"
+    },
+    "driveLoginPrompt": {
+        "message": "Log in to Google Drive to sync your files."
+    },
+    "driveLoginButton": {
+        "message": "Log in to Google Drive"
     }
 }
