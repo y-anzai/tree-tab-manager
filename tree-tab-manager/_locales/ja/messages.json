@@ -730,5 +730,26 @@
   },
   "tabSearchPlaceholder": {
     "message": "タブを検索..."
+  },
+  "navGoogleDrive": {
+    "message": "Drive"
+  },
+  "driveRecentTitle": {
+    "message": "最近利用したファイル"
+  },
+  "driveFoldersTitle": {
+    "message": "フォルダ"
+  },
+  "driveSearchPlaceholder": {
+    "message": "Driveを検索..."
+  },
+  "btnRefreshDrive": {
+    "message": "Driveを更新"
+  },
+  "driveLoginPrompt": {
+    "message": "Google Driveにログインしてファイルを同期します。"
+  },
+  "driveLoginButton": {
+    "message": "Google Driveにログイン"
   }
 }

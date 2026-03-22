@@ -221,9 +221,51 @@ async function fetchGoogleTasks() {
   }
 }
 
-// 定期同期と初期同期
-setInterval(fetchGoogleTasks, 3600000);
-setTimeout(fetchGoogleTasks, 5000);
+// Google Drive 同期
+let googleDriveCache = null;
+
+async function fetchGoogleDrive() {
+  try {
+    const token = await new Promise((resolve) => {
+      chrome.identity.getAuthToken({ interactive: false }, (t) => {
+        if (chrome.runtime.lastError) resolve(null);
+        else resolve(t);
+      });
+    });
+    if (!token) return false;
+
+    // 1. 全ファイル・フォルダを取得 (ツリー構築用)
+    const allFilesRes = await fetch('https://www.googleapis.com/drive/v3/files?q=trashed%3Dfalse&fields=files(id%2Cname%2Cparents%2CmimeType%2CiconLink%2CwebViewLink%2CmodifiedTime%2CviewedByMeTime)&pageSize=1000', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!allFilesRes.ok) return false;
+    const allFilesData = await allFilesRes.json();
+
+    // 2. 最近利用したファイルを取得
+    const recentRes = await fetch('https://www.googleapis.com/drive/v3/files?orderBy=viewedByMeTime+desc&pageSize=30&fields=files(id%2Cname%2CmimeType%2CiconLink%2CwebViewLink%2CmodifiedTime%2CviewedByMeTime)&q=trashed%3Dfalse', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!recentRes.ok) return false;
+    const recentData = await recentRes.json();
+
+    googleDriveCache = {
+      allFiles: allFilesData.files || [],
+      recent: recentData.files || [],
+      lastUpdated: Date.now()
+    };
+
+    await chrome.storage.local.set({ 'ttm-google-drive-cache': googleDriveCache });
+    notifyPanels({ type: 'GOOGLE_DRIVE_UPDATED' });
+    return true;
+  } catch (e) {
+    console.error('[TTM] Google Drive fetch failed:', e);
+    return false;
+  }
+}
+
+// 定期同期 (6時間ごと)
+setInterval(fetchGoogleDrive, 6 * 3600 * 1000);
+setTimeout(fetchGoogleDrive, 8000);
 
 loadTreeData();
 
@@ -263,9 +305,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'add-to-snippets') {
     try {
       // 1. まずメッセージを送ってみる
-      await chrome.tabs.sendMessage(tab.id, { 
+      await chrome.tabs.sendMessage(tab.id, {
         type: 'CAPTURE_SNIPPET',
-        selectionText: info.selectionText 
+        selectionText: info.selectionText
       });
     } catch (e) {
       console.log('[TTM] Content script not ready, injecting...');
@@ -277,9 +319,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         });
         // 3. 注入完了直後だとリスナーの準備に極短時間かかる場合があるため、少し待ってから送信
         setTimeout(() => {
-          chrome.tabs.sendMessage(tab.id, { 
+          chrome.tabs.sendMessage(tab.id, {
             type: 'CAPTURE_SNIPPET',
-            selectionText: info.selectionText 
+            selectionText: info.selectionText
           }).catch(err => console.error('[TTM] Retry sendMessage failed:', err));
         }, 100);
       } catch (err) {
@@ -508,6 +550,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'GET_GOOGLE_TASKS':
       sendResponse({ tasks: Object.fromEntries(googleTasksCache) });
       break;
+
+    case 'GET_GOOGLE_DRIVE':
+      chrome.storage.local.get('ttm-google-drive-cache').then(data => {
+        sendResponse({ drive: data['ttm-google-drive-cache'] || null });
+      });
+      return true;
+
+    case 'GET_GOOGLE_DRIVE_REFRESH':
+      fetchGoogleDrive().then(success => sendResponse({ success }));
+      return true;
+
+    case 'LOGIN_GOOGLE_DRIVE':
+      chrome.identity.getAuthToken({ interactive: true }, (token) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ success: false, error: chrome.runtime.lastError.message });
+        } else {
+          fetchGoogleDrive().then(() => sendResponse({ success: true }));
+        }
+      });
+      return true;
 
     case 'GET_TASK_LISTS':
       (async () => {
@@ -821,7 +883,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               // Ignore injection errors (e.g., chrome:// pages)
             }
             setTimeout(() => {
-              chrome.tabs.sendMessage(tabId, { type: 'SCROLL_TO_POSITION', scrollY, text }).catch(() => {});
+              chrome.tabs.sendMessage(tabId, { type: 'SCROLL_TO_POSITION', scrollY, text }).catch(() => { });
             }, 500);
           }
         }
