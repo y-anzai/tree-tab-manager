@@ -1,0 +1,46 @@
+#catan-advisor-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+}
+
+.catan-advisor-badge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font: 600 12px/1.4 system-ui, sans-serif;
+  color: #fff;
+  background: rgba(30, 34, 40, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ピップ数に応じた色。5（6/8）が最も強い。 */
+.catan-advisor-tier-1 { background: rgba(70, 80, 95, 0.85); }
+.catan-advisor-tier-2 { background: rgba(50, 100, 130, 0.85); }
+.catan-advisor-tier-3 { background: rgba(40, 130, 110, 0.85); }
+.catan-advisor-tier-4 { background: rgba(180, 140, 40, 0.9); }
+.catan-advisor-tier-5 { background: rgba(190, 70, 50, 0.92); }
+
+.catan-advisor-red {
+  border-color: #ff6b5a;
+  box-shadow: 0 0 0 1px rgba(255, 107, 90, 0.6);
+}
+
+/* 盗賊で止まっているヘクスは薄く、取り消し線で示す。 */
+.catan-advisor-blocked {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.catan-advisor-spot {
+  background: rgba(120, 60, 200, 0.92);
+  border-color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+}

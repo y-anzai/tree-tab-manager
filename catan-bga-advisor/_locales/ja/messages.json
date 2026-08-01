@@ -1,0 +1,4 @@
+{
+  "extName": { "message": "Catan Advisor for BGA" },
+  "extDesc": { "message": "Board Game Arena のカタンで、ピップ値の表示や開拓地・盗賊の評価をサイドパネルに表示します。" }
+}

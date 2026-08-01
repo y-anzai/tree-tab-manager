@@ -1,0 +1,116 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1c2024;
+  --muted: #5f6672;
+  --line: #e2e5ea;
+  --accent: #2f6f4f;
+  --warn: #a4560f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16191d;
+    --fg: #e8ebef;
+    --muted: #9aa2ad;
+    --line: #2b3038;
+    --accent: #6ac093;
+    --warn: #e0a35c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 12px;
+  font: 13px/1.6 system-ui, -apple-system, "Hiragino Sans", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+h1 { font-size: 15px; margin: 0; }
+h2 { font-size: 12px; margin: 0 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.section {
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.status { margin: 0 0 6px; color: var(--muted); }
+
+.warnings, .notes, .spots, .scarcity {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.warnings li { color: var(--warn); }
+.notes li { margin-bottom: 4px; }
+.notes li[data-level="good"] { color: var(--accent); }
+.notes li[data-level="warn"] { color: var(--warn); }
+
+.spots li { margin-bottom: 6px; }
+.spots .score { font-weight: 600; }
+.spots .why { color: var(--muted); display: block; }
+
+button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:hover { border-color: var(--accent); }
+
+.hint { color: var(--muted); margin: 0 0 8px; }
+
+.manual {
+  display: grid;
+  grid-template-columns: auto 1fr 60px;
+  gap: 4px 6px;
+  align-items: center;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.manual label { color: var(--muted); }
+.manual select, .manual input { font: inherit; width: 100%; }
+
+.manual-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bar {
+  display: inline-block;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-left: 6px;
+}
