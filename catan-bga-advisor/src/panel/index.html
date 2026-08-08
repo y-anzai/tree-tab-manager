@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Catan Advisor</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>Catan Advisor</h1>
+      <label class="switch">
+        <input type="checkbox" id="toggle-enabled" checked />
+        <span>有効</span>
+      </label>
+    </header>
+
+    <section class="section" aria-labelledby="display-heading">
+      <h2 id="display-heading">表示</h2>
+      <div class="toggles">
+        <label class="switch"><input type="checkbox" id="toggle-pips" checked /><span>ピップ値</span></label>
+        <label class="switch"><input type="checkbox" id="toggle-probability" /><span>確率(%)</span></label>
+        <label class="switch"><input type="checkbox" id="toggle-red" checked /><span>6/8 を強調</span></label>
+        <label class="switch"><input type="checkbox" id="toggle-spots" /><span>開拓地候補</span></label>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="status-heading">
+      <h2 id="status-heading">読み取り状況</h2>
+      <p class="status" id="status">盤面を読み取っています…</p>
+      <ul class="warnings" id="warnings"></ul>
+      <button type="button" id="refresh">再読み込み</button>
+    </section>
+
+    <section class="section" aria-labelledby="advice-heading">
+      <h2 id="advice-heading">アドバイス</h2>
+      <ul class="notes" id="notes"></ul>
+    </section>
+
+    <section class="section" aria-labelledby="spots-heading">
+      <h2 id="spots-heading">開拓地候補</h2>
+      <ol class="spots" id="spots"></ol>
+    </section>
+
+    <section class="section" aria-labelledby="robber-heading">
+      <h2 id="robber-heading">盗賊の置き場所</h2>
+      <ol class="spots" id="robber"></ol>
+    </section>
+
+    <section class="section" aria-labelledby="scarcity-heading">
+      <h2 id="scarcity-heading">資源バランス</h2>
+      <ul class="scarcity" id="scarcity"></ul>
+    </section>
+
+    <section class="section" aria-labelledby="manual-heading">
+      <h2 id="manual-heading">手動入力</h2>
+      <p class="hint">
+        自動読み取りが失敗する場合に使います。上の行から左→右の順に 19 ヘクスを入力してください。
+      </p>
+      <div class="manual" id="manual"></div>
+      <div class="manual-actions">
+        <button type="button" id="manual-apply">手動入力を適用</button>
+        <button type="button" id="manual-clear">自動読み取りに戻す</button>
+      </div>
+    </section>
+
+    <script src="../core/pips.js"></script>
+    <script src="../core/geometry.js"></script>
+    <script src="../core/board.js"></script>
+    <script src="../core/evaluate.js"></script>
+    <script src="panel.js"></script>
+  </body>
+</html>

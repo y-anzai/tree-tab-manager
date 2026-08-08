@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "version": "0.1.0",
+  "description": "__MSG_extDesc__",
+  "default_locale": "ja",
+  "permissions": ["storage", "sidePanel", "scripting"],
+  "host_permissions": ["https://*.boardgamearena.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://*.boardgamearena.com/*"],
+      "js": [
+        "src/core/pips.js",
+        "src/core/geometry.js",
+        "src/core/board.js",
+        "src/core/evaluate.js",
+        "src/content/scraper.js",
+        "src/content/overlay.js",
+        "src/content/main.js"
+      ],
+      "css": ["src/content/overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "src/panel/index.html"
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "__MSG_extName__",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

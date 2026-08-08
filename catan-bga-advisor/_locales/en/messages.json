@@ -1,0 +1,4 @@
+{
+  "extName": { "message": "Catan Advisor for BGA" },
+  "extDesc": { "message": "Shows pip values and evaluates settlement spots and robber placement for Catan on Board Game Arena, in a side panel." }
+}
