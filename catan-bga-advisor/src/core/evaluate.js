@@ -19,6 +19,14 @@
     development: { ore: 1, wool: 1, grain: 1 }
   };
 
+  /** 建設対象の表示名。 */
+  const BUILD_LABELS = {
+    road: '街道',
+    settlement: '開拓地',
+    city: '都市',
+    development: '発展カード'
+  };
+
   const WEIGHTS = {
     /** ピップ 1 点あたりの基礎点。 */
     pip: 1,
@@ -37,11 +45,11 @@
   };
 
   /**
-   * 盤面全体の資源別ピップ総量を数え、希少度（少ないほど大きい値）を返す。
+   * 盤面全体の資源別ピップ総量を数える。
    * @param {object} board
    * @returns {Record<string, number>}
    */
-  function resourceScarcity(board) {
+  function resourceTotals(board) {
     /** @type {Record<string, number>} */
     const totals = {};
     for (const resource of Pips.RESOURCES) totals[resource] = 0;
@@ -51,7 +59,16 @@
       if (!data.resource || data.resource === 'desert') continue;
       totals[data.resource] = (totals[data.resource] || 0) + Pips.pipsOf(data.number);
     }
+    return totals;
+  }
 
+  /**
+   * 資源別の希少度（産出が平均より少ないほど大きい、0〜1）を返す。
+   * @param {object} board
+   * @returns {Record<string, number>}
+   */
+  function resourceScarcity(board) {
+    const totals = resourceTotals(board);
     const values = Object.values(totals).filter((v) => v > 0);
     if (values.length === 0) return {};
     const average = values.reduce((a, b) => a + b, 0) / values.length;
@@ -130,7 +147,7 @@
         reasons.push('3:1 港に隣接');
       } else if ((production.byResource[port.resource] || 0) > 0) {
         score += WEIGHTS.resourcePort;
-        reasons.push(`${port.resource} の 2:1 港と噛み合う`);
+        reasons.push(`${Pips.labelOf(port.resource)} の 2:1 港と噛み合う`);
       }
     }
 
@@ -268,7 +285,7 @@
       const best = spots[0];
       notes.push({
         level: 'good',
-        text: `最有力の開拓地候補は ${best.pips} ピップ（${Object.keys(best.resources).join('・') || '不明'}）。${best.reasons[0] || ''}`
+        text: `最有力の開拓地候補は ${best.pips} ピップ（${Object.keys(best.resources).map(Pips.labelOf).join('・') || '不明'}）。${best.reasons[0] || ''}`
       });
     }
 
@@ -279,7 +296,7 @@
       if (missing.length > 0) {
         notes.push({
           level: 'warn',
-          text: `自分の産出に ${missing.join('・')} がありません。港か交易で補う前提で動きましょう。`
+          text: `自分の産出に ${missing.map(Pips.labelOf).join('・')} がありません。港か交易で補う前提で動きましょう。`
         });
       }
     }
@@ -287,7 +304,7 @@
     const options = buildOptions(board.selfResources || {});
     const affordable = options.filter((o) => o.affordable).map((o) => o.target);
     if (affordable.length > 0) {
-      notes.push({ level: 'good', text: `いま建設可能: ${affordable.join('・')}` });
+      notes.push({ level: 'good', text: `いま建設可能: ${affordable.map((t) => BUILD_LABELS[t] || t).join('・')}` });
     }
 
     return notes;
@@ -295,7 +312,9 @@
 
   root.CatanEvaluate = {
     COSTS,
+    BUILD_LABELS,
     WEIGHTS,
+    resourceTotals,
     resourceScarcity,
     scoreVertex,
     rankSettlementSpots,

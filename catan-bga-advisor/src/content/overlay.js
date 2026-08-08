@@ -8,6 +8,12 @@
   const Pips = root.CatanPips;
   const LAYER_ID = 'catan-advisor-overlay';
 
+  /**
+   * バッジをヘクス中心から上にずらす量（px）。
+   * 中心に置くと数字トークンそのものを覆ってしまい、盤面が読めなくなる。
+   */
+  const BADGE_OFFSET_Y = 30;
+
   /** 表示切り替えの状態。side panel からのメッセージで更新される。 */
   const state = {
     showPips: true,
@@ -38,14 +44,15 @@
    * @param {{x: number, y: number}} point
    * @param {string} text
    * @param {string[]} modifiers 追加クラス（tier / red など）
+   * @param {number} [offsetY] 中心からの上方向のずらし量
    * @returns {HTMLElement}
    */
-  function createBadge(point, text, modifiers) {
+  function createBadge(point, text, modifiers, offsetY = BADGE_OFFSET_Y) {
     const badge = document.createElement('div');
     badge.className = ['catan-advisor-badge', ...modifiers].join(' ');
     badge.textContent = text;
     badge.style.left = `${point.x + window.scrollX}px`;
-    badge.style.top = `${point.y + window.scrollY}px`;
+    badge.style.top = `${point.y + window.scrollY - offsetY}px`;
     return badge;
   }
 
@@ -79,7 +86,8 @@
     if (state.showSpots) {
       for (const marker of state.spotMarkers) {
         layer.appendChild(
-          createBadge(marker, `#${marker.rank}`, ['catan-advisor-spot'])
+          // 候補マーカーは頂点そのものを指すのでずらさない。
+          createBadge(marker, `#${marker.rank}`, ['catan-advisor-spot'], 0)
         );
       }
     }

@@ -16,6 +16,25 @@
   /** 資源の種類。desert は産出なし。 */
   const RESOURCES = ['brick', 'lumber', 'wool', 'grain', 'ore'];
 
+  /** 表示用の資源名。core / panel で同じ表記を使うためここに集約する。 */
+  const RESOURCE_LABELS = {
+    brick: 'レンガ',
+    lumber: '木材',
+    wool: '羊毛',
+    grain: '小麦',
+    ore: '鉱石',
+    desert: '砂漠'
+  };
+
+  /**
+   * 資源キーを表示名にする。未知のキーはそのまま返す。
+   * @param {string} resource
+   * @returns {string}
+   */
+  function labelOf(resource) {
+    return RESOURCE_LABELS[resource] || resource;
+  }
+
   /**
    * 数字トークンのピップ数を返す。7 や無効値は 0。
    * @param {number|string|null|undefined} number
@@ -59,6 +78,8 @@
     PIP_BY_NUMBER,
     TOTAL_COMBINATIONS,
     RESOURCES,
+    RESOURCE_LABELS,
+    labelOf,
     pipsOf,
     probabilityOf,
     pipTier,

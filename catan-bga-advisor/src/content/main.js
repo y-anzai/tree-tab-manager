@@ -40,6 +40,7 @@
     const analysis = {
       completeness: board.completeness,
       diagnostics: raw.diagnostics || null,
+      totals: Evaluate.resourceTotals(board),
       scarcity: Evaluate.resourceScarcity(board),
       topSpots: Evaluate.rankSettlementSpots(board, { limit: 8 }),
       robber: Evaluate.rankRobberPlacements(board).slice(0, 5),

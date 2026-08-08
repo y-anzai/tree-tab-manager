@@ -13,15 +13,6 @@
     showSpots: false
   };
 
-  const RESOURCE_LABELS = {
-    brick: 'レンガ',
-    lumber: '木材',
-    wool: '羊毛',
-    grain: '小麦',
-    ore: '鉱石',
-    desert: '砂漠'
-  };
-
   const HEX_COUNT = 19;
 
   const elements = {
@@ -83,9 +74,8 @@
     return li;
   }
 
-  function resourceLabel(resource) {
-    return RESOURCE_LABELS[resource] || resource;
-  }
+  const RESOURCE_LABELS = globalThis.CatanPips.RESOURCE_LABELS;
+  const resourceLabel = globalThis.CatanPips.labelOf;
 
   /**
    * 解析結果をパネル全体に反映する。
@@ -125,13 +115,17 @@
       return li;
     });
 
-    const scarcityEntries = Object.entries(analysis.scarcity || {}).sort((a, b) => b[1] - a[1]);
-    renderList(elements.scarcity, scarcityEntries, ([resource, value]) => {
+    // 盤面全体のピップ総量で比較する。棒の長さは最大値を 100% とした相対量。
+    const totals = analysis.totals || {};
+    const maxTotal = Math.max(1, ...Object.values(totals));
+    const balanceEntries = Object.entries(totals).sort((a, b) => a[1] - b[1]);
+    renderList(elements.scarcity, balanceEntries, ([resource, total]) => {
       const li = document.createElement('li');
-      li.textContent = `${resourceLabel(resource)}: ${value > 0.2 ? '希少' : '十分'}`;
+      const scarce = (analysis.scarcity || {})[resource] > 0.2;
+      li.textContent = `${resourceLabel(resource)} ${total} ピップ${scarce ? '（希少）' : ''}`;
       const bar = document.createElement('span');
       bar.className = 'bar';
-      bar.style.width = `${Math.round(Math.min(1, value) * 60) + 4}px`;
+      bar.style.width = `${Math.round((total / maxTotal) * 70) + 4}px`;
       li.appendChild(bar);
       return li;
     });
